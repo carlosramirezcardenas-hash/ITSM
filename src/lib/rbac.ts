@@ -20,6 +20,11 @@ export const PERMISSIONS = [
   "tickets:assignAny",    // asignar a cualquier agente/equipo
   "tickets:create",
   "approvals:decide",
+  "problems:manage",     // gestión de problemas
+  "changes:create",      // registrar e implementar cambios
+  "changes:approve",     // miembro del CAB
+  "cmdb:view",
+  "cmdb:manage",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -29,12 +34,14 @@ const ROLE_PERMS: Record<Role, Permission[]> = {
     "org:manage", "users:manage", "teams:manage", "catalog:manage", "sla:manage", "kb:manage",
     "audit:view", "reports:view", "tickets:work", "tickets:viewAll", "tickets:assignAny",
     "tickets:create", "approvals:decide",
+    "problems:manage", "changes:create", "changes:approve", "cmdb:view", "cmdb:manage",
   ],
   SERVICE_MANAGER: [
     "teams:manage", "catalog:manage", "sla:manage", "kb:manage", "reports:view",
     "tickets:work", "tickets:viewAll", "tickets:assignAny", "tickets:create", "approvals:decide",
+    "problems:manage", "changes:create", "changes:approve", "cmdb:view", "cmdb:manage",
   ],
-  AGENT: ["tickets:work", "tickets:viewAll", "tickets:create", "kb:manage"],
+  AGENT: ["tickets:work", "tickets:viewAll", "tickets:create", "kb:manage", "problems:manage", "changes:create", "cmdb:view"],
   APPROVER: ["tickets:create", "approvals:decide"],
   END_USER: ["tickets:create"],
 };
