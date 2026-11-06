@@ -92,7 +92,8 @@ export function LearningClient({ solutions, terms, unanswered }: { solutions: So
         </Card>
         <Card>
           <CardHeader title={<span className="flex items-center gap-1.5"><MessageCircleQuestion className="h-4 w-4 text-rose-500" />Preguntas sin buena respuesta</span>}
-            description="Lo que preguntaron y no tuvo guía, solución ni servicio, o recibió 👎. Úsalo para crear guías o servicios nuevos." />
+            description="Lo que preguntaron y no tuvo guía, solución ni servicio, o recibió 👎."
+            action={<a href="/help/gaps" className="whitespace-nowrap text-xs font-medium text-primary hover:underline">Ver temas y crear guías →</a>} />
           {unanswered.length === 0 ? <EmptyState title="Nada pendiente" description="El asistente encontró respuesta para todo en los últimos 30 días." /> : (
             <ul className="divide-y divide-border">
               {unanswered.map((q) => (

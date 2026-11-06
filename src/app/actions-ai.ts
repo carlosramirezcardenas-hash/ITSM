@@ -8,6 +8,7 @@ import * as AU from "@/server/automation";
 import * as IN from "@/server/integrations";
 import { assistantFeedback, assistantOutcome, assistantTurn } from "@/server/assistant";
 import * as LA from "@/server/learning-admin";
+import * as KG from "@/server/kb-gaps";
 import { getMetrics, getItsmMetrics } from "@/server/metrics";
 import { updateTicket } from "@/server/tickets";
 import { db } from "@/lib/db";
@@ -132,4 +133,15 @@ export async function termDisabledAction(id: string, disabled: boolean) {
 }
 export async function termDeleteAction(id: string) {
   return run(async () => LA.deleteTerm(await getCtx("catalog:manage"), id), "Palabra eliminada.", ["/admin/assistant"]);
+}
+
+// ------------------------------------------------ Lo que falta en el centro de ayuda
+export async function gapDraftAction(key: string) {
+  return run(async () => KG.draftArticleForGap(await getCtx("kb:manage"), key), "Borrador creado. Revísalo y publícalo cuando esté listo.", ["/help/gaps", "/help"]);
+}
+export async function gapAddWordsAction(key: string, articleId: string) {
+  return run(async () => KG.addGapWordsToArticle(await getCtx("kb:manage"), key, articleId), "Listo: la guía ahora se encuentra con esas palabras.", ["/help/gaps"]);
+}
+export async function gapDismissAction(key: string) {
+  return run(async () => KG.dismissGap(await getCtx("kb:manage"), key), "Tema descartado.", ["/help/gaps"]);
 }

@@ -136,6 +136,16 @@ async function main() {
     assert.match(await cam.getByLabel("Mensaje").inputValue(), /Respuesta simulada/);
     await shot(cam, "p3-03-ticket-ia");
   });
+  await step("IA redacta un borrador de guía desde «Lo que falta» (queda como borrador)", async () => {
+    await cam.goto("/help/gaps");
+    await cam.getByText("«Redactar guía» usa IA").waitFor();
+    await cam.getByRole("button", { name: "Redactar guía" }).first().click();
+    await cam.waitForURL(/\/help\/edit\//);
+    assert.equal(await cam.getByLabel("Título").inputValue(), "Respuesta simulada (title).");
+    assert.match(await cam.getByLabel("Contenido").inputValue(), /1\. Respuesta simulada \(steps\)\./);
+    assert.match(await cam.getByLabel("Contenido").inputValue(), /redactado por IA/);
+    assert.equal(await cam.getByRole("combobox").last().inputValue(), "DRAFT");
+  });
   await step("Webhook firmado recibido para ticket creado", async () => {
     const s = await until(async () => { const x = await stats(); return x.hooks.some((h) => h.body.includes("ticket.created")) ? x : null; });
     const h = s.hooks.find((x) => x.body.includes("ticket.created"))!;

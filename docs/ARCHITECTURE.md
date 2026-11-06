@@ -177,6 +177,14 @@ El asistente mejora con el uso de cada organización, de forma visible y reversi
    soluciones (queda «revisada» y no cambia sola), desactiva o borra palabras y ve las preguntas sin buena respuesta.
    Todo queda en auditoría.
 
+4. **Lo que falta en el centro de ayuda** (`/help/gaps`, para quien gestiona guías): agrupa en temas, sin IA (raíces
+   compartidas), lo que se preguntó al asistente sin buena respuesta (sin guía/solución/servicio, 👎 o terminó en
+   reporte) y los incidentes de los últimos 30 días que ninguna guía publicada cubre. Ordena por personas afectadas.
+   Por tema: «Redactar guía» (Claude, usando solo las soluciones reales; sin ellas deja los pasos por completar) o
+   «Crear borrador» sin IA; siempre queda en **borrador** para que una persona lo revise y publique. Si ya existe una
+   guía que la gente no encontró, «Agregar palabras a la guía» suma las palabras que usaron como etiquetas. Los temas
+   se pueden descartar («No necesita guía») y desaparecen solos cuando se publica una guía que los cubre.
+
 Las conversaciones se guardan recortadas (300 caracteres) y se borran a los 180 días. El aprendizaje corre al resolver
 o reabrir cada ticket. Importar el historial anterior es una acción explícita del administrador («Aprender del historial»),
 para revisar primero datos antiguos; el cron diario solo aplica la retención. Con IA, las soluciones aprendidas y el
@@ -302,7 +310,7 @@ desarrollo (sin clave); se habilitan al definir `ANTHROPIC_API_KEY`.
 ### Experiencias diferenciadas ✅ implementadas y probadas
 Portal del empleado vs. Operaciones TI, catálogo visual con filas por categoría y asistente conversacional con modo
 básico sin IA, y aprendizaje del asistente (vocabulario, soluciones que funcionaron, revisión humana) (ver sección 4).
-Pruebas: `npm run test:e2e:x` (18) y el paso de asistente con IA en `test:e2e:3`.
+Pruebas: `npm run test:e2e:x` (21) y los pasos de asistente y borrador de guía con IA en `test:e2e:3`.
 
 ### Aún NO implementado
 - Inicio de sesión único (SSO / Entra ID), creación de tickets desde correos entrantes, adjuntos de archivos,

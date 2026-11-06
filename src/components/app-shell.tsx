@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Home, PlusCircle, Inbox, LayoutGrid, BookOpen, CheckSquare, BarChart3, Users, UsersRound, Tags, Timer,
-  ScrollText, Settings, Building2, Menu, X, LogOut, UserCircle, ListChecks, Sparkles, ChevronDown, Bot, Bug, GitPullRequestArrow, Network, CalendarDays, Workflow, Plug,
+  ScrollText, Settings, Building2, Menu, X, LogOut, UserCircle, ListChecks, Sparkles, ChevronDown, Bot, Bug, SearchX, GitPullRequestArrow, Network, CalendarDays, Workflow, Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./ui";
@@ -17,7 +17,7 @@ import { ExperienceSwitch } from "./experience-switch";
 const ICONS = {
   home: Home, plus: PlusCircle, inbox: Inbox, grid: LayoutGrid, book: BookOpen, check: CheckSquare, chart: BarChart3,
   users: Users, teams: UsersRound, tags: Tags, timer: Timer, audit: ScrollText, settings: Settings, building: Building2,
-  list: ListChecks, bug: Bug, change: GitPullRequestArrow, cmdb: Network, calendar: CalendarDays, workflow: Workflow, plug: Plug, bot: Bot,
+  list: ListChecks, bug: Bug, change: GitPullRequestArrow, cmdb: Network, calendar: CalendarDays, workflow: Workflow, plug: Plug, bot: Bot, searchx: SearchX,
 };
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: number; primary?: boolean };
 export type NavSection = { title?: string; items: NavItem[] };

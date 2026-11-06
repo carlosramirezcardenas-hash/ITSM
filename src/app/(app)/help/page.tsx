@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BookOpen, ChevronDown, Eye, PenSquare, Search, ThumbsUp } from "lucide-react";
+import { BookOpen, ChevronDown, Eye, PenSquare, Search, ThumbsUp, SearchX } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -43,7 +43,12 @@ export default async function HelpPage({ searchParams }: { searchParams: Promise
           <input name="q" defaultValue={q} placeholder="¿Qué necesitas resolver?" className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" aria-label="Buscar artículos" />
           <button className={buttonClass("primary", "sm")}>Buscar</button>
         </form>
-        {manage && <Link href="/help/edit/new" className={buttonClass("outline", "sm", "mt-4")}><PenSquare className="h-4 w-4" />Nuevo artículo</Link>}
+        {manage && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Link href="/help/edit/new" className={buttonClass("outline", "sm")}><PenSquare className="h-4 w-4" />Nuevo artículo</Link>
+            <Link href="/help/gaps" className={buttonClass("outline", "sm")}><SearchX className="h-4 w-4" />Lo que falta</Link>
+          </div>
+        )}
       </div>
       <div className="scrollbar-thin mb-6 flex gap-1.5 overflow-x-auto pb-1">
         <Link href="/help" className={cn("whitespace-nowrap rounded-full border px-3 py-1 text-sm", !c ? "border-primary bg-primary-soft text-primary" : "border-border bg-card text-muted")}>Todo</Link>

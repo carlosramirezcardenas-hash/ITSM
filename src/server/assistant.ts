@@ -170,7 +170,11 @@ Nunca inventes servicios, guías ni estados que no estén en los datos.`,
   const topService = rankedServices[0];
   const isProblem = PROBLEM_RE.test(n);
   const wantsSomething = REQUEST_RE.test(n) && !isProblem;
-  if (topService && !isProblem && topService.score >= 0.5 && (wantsSomething || topService.score >= 1.2)) {
+  // Una guía que coincide claramente gana a un servicio que solo coincide en parte (ej. «de nuevo» ≠ pedir algo nuevo)
+  const bestArticle = rankedArticles[0];
+  const serviceMatch = topService ? matchScore(last, `${topService.name} ${topService.description}`) + (boosts.get(`SERVICE:${topService.id}`) ?? 0) : 0;
+  const articleWins = !!bestArticle && bestArticle.score >= 0.6 && bestArticle.score > serviceMatch;
+  if (topService && !isProblem && !articleWins && topService.score >= 0.5 && (wantsSomething || topService.score >= 1.2)) {
     return { ...base, intent: "request", reply: `Para eso tenemos el servicio «${topService.name}». Ábrelo, completa el formulario y listo.`, service: pickService(topService.id) };
   }
   const helpful = rankedArticles.filter((a) => a.score >= 0.34).slice(0, 3);

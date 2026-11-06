@@ -95,6 +95,7 @@ model Organization {
   assistantInteractions AssistantInteraction[]
   assistantTerms        AssistantTerm[]
   learnedSolutions      LearnedSolution[]
+  kbGapDismissals       KbGapDismissal[]
 }
 
 model User {
@@ -878,4 +879,19 @@ model LearnedSolution {
   updatedAt          DateTime     @updatedAt
 
   @@index([orgId, status])
+}
+
+/**
+ * Temas del centro de ayuda descartados por el equipo («no necesita guía»).
+ */
+model KbGapDismissal {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  key       String
+  label     String
+  userId    String?
+  createdAt DateTime     @default(now())
+
+  @@unique([orgId, key])
 }

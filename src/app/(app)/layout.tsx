@@ -53,6 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (can(r, "problems:manage")) mgmt.items.push({ href: "/problems", label: "Problemas", icon: "bug" });
     if (can(r, "changes:create")) mgmt.items.push({ href: "/changes", label: "Cambios", icon: "change", badge: pendingChanges });
     if (can(r, "cmdb:view")) mgmt.items.push({ href: "/cmdb", label: "CMDB", icon: "cmdb" });
+    if (can(r, "kb:manage")) mgmt.items.push({ href: "/help/gaps", label: "Lo que falta en ayuda", icon: "searchx" });
     if (can(r, "reports:view")) mgmt.items.push({ href: "/reports", label: "Dashboard y reportes", icon: "chart" });
     if (mgmt.items.length) sections.push(mgmt);
     const admin: NavSection = { title: "Administración", items: [] };

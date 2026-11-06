@@ -140,6 +140,7 @@ async function main() {
   // Palabra inventada única por ejecución (la raíz son las 5 primeras letras): la prueba no depende de corridas anteriores
   const slang = "qz" + Array.from({ length: 5 }, () => "bcdfghjklmnprstvw"[Math.floor(Math.random() * 17)]).join("");
   const sofia = await session("sofia@andes.demo");
+  const cam = await session("camila@andes.demo");
   const ask = async (p: typeof ana, text: string) => {
     const before = await p.locator("p.bg-subtle").count();
     await p.getByLabel("Mensaje para el asistente").fill(text);
@@ -230,6 +231,56 @@ async function main() {
     await adm.getByRole("button", { name: "Mostrar Excel se cierra solo al abrir archivos grandes" }).click();
     await adm.getByText("Solución visible para el asistente.").waitFor();
   });
+  console.log("Lo que falta en el centro de ayuda");
+  const gapWord = "qv" + Array.from({ length: 5 }, () => "bcdfghjklmnprstvw"[Math.floor(Math.random() * 17)]).join("");
+  const gapQuery = (who: string) => `el plotter ${gapWord} no corta el vinilo ${who}`;
+  await step("Preguntas sin respuesta de varias personas se agrupan en un tema", async () => {
+    await ana.goto("/assistant"); await ask(ana, gapQuery("hoy"));
+    await sofia.goto("/assistant"); await ask(sofia, gapQuery("en la tarde"));
+    await cam.goto("/help/gaps");
+    const card = cam.locator("div.rounded-xl", { hasText: gapWord }).first();
+    await card.waitFor();
+    await card.getByText("2 personas").waitFor();
+    await card.getByText("2 en el asistente").waitFor();
+    // Los incidentes recientes sin guía también aparecen como temas
+    await cam.getByText("Wi-Fi se desconecta en sala de reuniones").first().waitFor();
+  });
+  await step("Crear borrador desde el tema, revisarlo y publicarlo: el asistente ya lo encuentra", async () => {
+    await cam.goto("/help/gaps");
+    const card = cam.locator("div.rounded-xl", { hasText: gapWord }).first();
+    await card.getByRole("button", { name: /Crear borrador|Redactar guía/ }).click();
+    await cam.waitForURL(/\/help\/edit\//);
+    const body = cam.getByLabel("Contenido");
+    assert.match(await body.inputValue(), new RegExp(gapWord));
+    // el tema muestra el borrador en revisión (no se duplica)
+    await cam.goto("/help/gaps");
+    await cam.locator("div.rounded-xl", { hasText: gapWord }).first().getByRole("link", { name: "Revisar borrador" }).click();
+    await cam.waitForURL(/\/help\/edit\//);
+    // mientras es borrador, la gente no lo ve
+    await sofia.goto("/assistant");
+    assert.ok(!(await ask(sofia, gapQuery("otra vez"))).includes("Esto podría resolverlo"));
+    await cam.getByLabel("Contenido").fill(`Si el plotter ${gapWord} no corta:\n1. Revisa que la cuchilla esté instalada.\n2. Ajusta la presión de corte a 120 g.\n3. Si no se soluciona, envía un reporte desde el asistente.`);
+    await cam.getByRole("combobox").last().selectOption("PUBLISHED");
+    await cam.getByRole("button", { name: "Guardar" }).click();
+    await cam.waitForURL((u) => !u.pathname.startsWith("/help/edit"));
+    await sofia.goto("/assistant");
+    await ask(sofia, gapQuery("de nuevo"));
+    await sofia.getByRole("link", { name: new RegExp(`plotter ${gapWord}`, "i") }).first().waitFor();
+    // ya no figura como pendiente
+    await cam.goto("/help/gaps");
+    await cam.getByRole("heading", { name: "Lo que falta en el centro de ayuda" }).waitFor();
+    assert.equal(await cam.getByText(gapWord).count(), 0);
+  });
+  await step("Descartar un tema que no necesita guía; usuario final no accede", async () => {
+    await cam.goto("/help/gaps");
+    const label = "Wi-Fi se desconecta en sala de reuniones";
+    await cam.getByRole("button", { name: `Descartar ${label}` }).click();
+    await cam.getByText("Tema descartado.").waitFor();
+    await cam.waitForFunction((l) => !Array.from(document.querySelectorAll("main p.font-medium")).some((e) => e.textContent === l), label);
+    await ana.goto("/help/gaps");
+    await ana.waitForURL(/denied=1/);
+  });
+
   await step("RBAC: un agente no administra el aprendizaje", async () => {
     const camRbac = await session("camila@andes.demo");
     await camRbac.goto("/admin/assistant");
@@ -237,7 +288,7 @@ async function main() {
   });
 
   console.log("Equipo de TI (Camila, agente)");
-  const cam = await session("camila@andes.demo");
+  await cam.goto("/home");
   await step("El agente entra a Operaciones TI y puede cambiar al portal y volver", async () => {
     await cam.getByRole("heading", { name: "Tu día de un vistazo" }).waitFor();
     await cam.getByRole("link", { name: /Bandeja de trabajo/ }).waitFor();
