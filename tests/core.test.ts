@@ -188,3 +188,11 @@ test("Predicción: riesgo de incumplimiento de SLA", () => {
   assert.equal(breachRisk({ ...base, resolutionDueAt: new Date(now.getTime() - 1) }, now).score, 100);
   assert.equal(breachRisk({ ...base, createdAt: new Date(now.getTime() - 60_000), resolutionDueAt: new Date(now.getTime() + 600 * 60_000) }, now).level, "low");
 });
+
+test("Asistente: coincidencia por raíces tolera plurales y acentos", async () => {
+  const { matchScore } = await import("../src/lib/classify");
+  assert.equal(matchScore("impresoras", "La impresora no imprime"), 1);
+  assert.ok(matchScore("necesito un notebook nuevo", "Solicitar un notebook nuevo o renovación") >= 0.6);
+  assert.equal(matchScore("vpn", "Correo y calendario"), 0);
+  assert.equal(matchScore("", "algo"), 0);
+});

@@ -133,6 +133,36 @@ Principios aplicados (sección 8 del brief):
 
 ---
 
+### Dos experiencias sobre la misma plataforma
+
+| | **Portal del empleado** | **Operaciones TI** |
+|---|---|---|
+| Para | Usuarios finales y aprobadores (siempre); equipo de TI cuando lo elige | Agentes, gestores y administradores |
+| Navegación | Barra superior: Inicio, Servicios, Mis solicitudes, Aprobaciones, Ayuda | Menú lateral: bandeja, problemas, cambios, CMDB, reportes, administración |
+| Lenguaje | Sin ITIL: «algo no funciona», «quiero pedir algo», estados en palabras simples | Términos ITIL: incidente, SLA, prioridad, CAB, error conocido |
+| Asistente | Botón flotante en todas las páginas + página `/assistant` | Ayudas de IA dentro del ticket (triage, resumen, respuesta) |
+
+El equipo de TI alterna con el selector «Portal del empleado / Operaciones TI» (cookie `itsm_exp`, httpOnly).
+La experiencia solo cambia la navegación y el inicio: **los permisos no cambian** (RBAC se valida siempre en el
+servidor) y un usuario final no puede activar Operaciones aunque fuerce la cookie.
+
+### Catálogo visual («tipo streaming»)
+`/catalog` muestra un servicio destacado (el más pedido), filas desplazables «Pedir de nuevo» (lo que la persona ya
+usó), «Popular en {empresa}» y una fila por categoría, con portada de color por categoría, tiempo estimado y si
+requiere aprobación. La búsqueda y los filtros por categoría cambian a cuadrícula.
+
+### Asistente conversacional (ITIL invisible)
+La persona escribe con sus palabras; el asistente **propone** una de estas salidas: una guía del centro de ayuda,
+el servicio del catálogo que corresponde, el estado de sus solicitudes o un reporte ya redactado (título, impacto y
+urgencia deducidos). **Nunca crea nada por su cuenta**: el reporte se envía solo cuando la persona presiona
+«Enviar reporte» (canal `chat`), con sus propios permisos.
+- Con IA (`ANTHROPIC_API_KEY` y la IA activa en la organización): Claude con salida estructurada; los identificadores
+  que devuelve se validan contra el catálogo, las guías y las solicitudes reales de la persona (lo inventado se descarta).
+- Sin IA, o si la llamada falla: **modo básico** con reglas (raíces de palabras, palabras clave por categoría,
+  catálogo y centro de ayuda). El chat indica en qué modo respondió.
+
+---
+
 ## 5. Flujos principales
 
 **Incidente** (`server/tickets.ts › createIncident`)
@@ -247,6 +277,10 @@ Pruebas: la IA se prueba de punta a punta contra `tests/mock-anthropic.ts`, que 
 de fallback, salida estructurada estricta, sin parámetros retirados como `temperature` o `budget_tokens`, sin *prefill*)
 y responde datos que cumplen el esquema. Las llamadas reales al modelo no se pudieron ejecutar en el entorno de
 desarrollo (sin clave); se habilitan al definir `ANTHROPIC_API_KEY`.
+
+### Experiencias diferenciadas ✅ implementadas y probadas
+Portal del empleado vs. Operaciones TI, catálogo visual con filas por categoría y asistente conversacional con modo
+básico sin IA (ver sección 4). Pruebas: `npm run test:e2e:x` y el paso de asistente con IA en `test:e2e:3`.
 
 ### Aún NO implementado
 - Inicio de sesión único (SSO / Entra ID), creación de tickets desde correos entrantes, adjuntos de archivos,

@@ -12,6 +12,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { NotificationBell } from "./notification-bell";
 import { CommandPalette, SearchButton } from "./command-palette";
 import { logoutAction } from "@/app/actions";
+import { ExperienceSwitch } from "./experience-switch";
 
 const ICONS = {
   home: Home, plus: PlusCircle, inbox: Inbox, grid: LayoutGrid, book: BookOpen, check: CheckSquare, chart: BarChart3,
@@ -21,8 +22,9 @@ const ICONS = {
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: number; primary?: boolean };
 export type NavSection = { title?: string; items: NavItem[] };
 
-export function AppShell({ sections, user, children }: {
+export function AppShell({ sections, user, canSwitch = false, children }: {
   sections: NavSection[];
+  canSwitch?: boolean;
   user: { name: string; email: string; roleLabel: string; orgName: string | null };
   children: React.ReactNode;
 }) {
@@ -68,6 +70,7 @@ export function AppShell({ sections, user, children }: {
         ))}
       </div>
       <div className="relative border-t border-border p-3">
+        {canSwitch && <ExperienceSwitch current="ops" className="mb-2 md:hidden" />}
         <button onClick={() => setMenuOpen((o) => !o)} className="flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left hover:bg-card" aria-expanded={menuOpen}>
           <Avatar name={user.name} size={30} />
           <span className="min-w-0 flex-1 leading-tight">
@@ -105,6 +108,7 @@ export function AppShell({ sections, user, children }: {
         <button onClick={() => setMobileOpen(true)} className="-ml-1 rounded-md p-1.5 text-muted lg:hidden" aria-label="Abrir menú"><Menu className="h-5 w-5" /></button>
         <SearchButton className="w-full max-w-xs" />
         <div className="flex-1" />
+        {canSwitch && <ExperienceSwitch current="ops" className="hidden md:flex" />}
         <ThemeToggle />
         <NotificationBell />
       </header>

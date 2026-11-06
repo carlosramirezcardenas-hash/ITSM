@@ -244,7 +244,7 @@ async function main() {
   const pat = await session("patricia@andes.demo");
   await step("Notebook: jefatura (nivel 1) → TI (nivel 2) → asignado", async () => {
     await ana.goto("/catalog");
-    await ana.getByRole("link", { name: /Solicitar un notebook/ }).click();
+    await ana.getByRole("link", { name: /Solicitar un notebook/ }).first().click();
     await ana.getByText(/Patricia Lagos y luego Valentina Rojas/).waitFor();
     await ana.getByLabel("¿Qué tipo de equipo necesitas?").selectOption("Estándar (oficina)");
     await ana.getByLabel("Motivo").selectOption("Equipo con falla");

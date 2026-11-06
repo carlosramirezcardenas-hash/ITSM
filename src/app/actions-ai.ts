@@ -6,6 +6,7 @@ import { type ActionResult, toActionError } from "@/server/errors";
 import * as AI from "@/server/ai-features";
 import * as AU from "@/server/automation";
 import * as IN from "@/server/integrations";
+import { assistantTurn } from "@/server/assistant";
 import { getMetrics, getItsmMetrics } from "@/server/metrics";
 import { updateTicket } from "@/server/tickets";
 import { db } from "@/lib/db";
@@ -100,4 +101,11 @@ export async function createApiKeyAction(input: unknown) {
 }
 export async function revokeApiKeyAction(id: string) {
   return run(async () => IN.revokeApiKey(await getCtx("org:manage"), id), "Clave revocada.", ["/admin/integrations"]);
+}
+
+// ------------------------------------------------ Asistente del portal (solo propone; la persona confirma)
+export async function assistantAction(messages: { role: "user" | "assistant"; content: string }[]) {
+  return run(async () => {
+    return assistantTurn(await getCtx("tickets:create"), { messages });
+  });
 }

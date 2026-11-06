@@ -69,7 +69,7 @@ async function main() {
   });
   await step("Solicitud de catálogo con aprobación de jefatura", async () => {
     await ana.goto("/catalog");
-    await ana.getByRole("link", { name: /Acceso a un sistema/ }).click();
+    await ana.getByRole("link", { name: /Acceso a un sistema/ }).first().click();
     await ana.getByLabel("Sistema").selectOption("Salesforce");
     await ana.getByLabel("Tipo de acceso").selectOption("Solo lectura");
     await ana.getByLabel("¿Para qué lo necesitas?").fill("Revisar oportunidades de clientes de Finanzas");
@@ -81,7 +81,7 @@ async function main() {
   });
   await step("Validación: formulario no se envía con campos obligatorios vacíos", async () => {
     await ana.goto("/catalog");
-    await ana.getByRole("link", { name: /Alta de nuevo colaborador/ }).click();
+    await ana.getByRole("link", { name: /Alta de nuevo colaborador/ }).first().click();
     await ana.getByRole("button", { name: "Enviar solicitud" }).click();
     assert.ok((await ana.getByText("Este campo es obligatorio.").count()) >= 3);
   });
@@ -140,7 +140,14 @@ async function main() {
     await mgr.getByRole("button", { name: "Resolver" }).click();
     await mgr.getByLabel(/¿Qué se hizo/).fill("Se reinició el concentrador VPN y se renovó el certificado.");
     await mgr.getByRole("button", { name: "Marcar como resuelto" }).click();
-    await mgr.getByText("Cambios guardados.").waitFor();
+    // Espera el estado real (el aviso «Cambios guardados.» de «Tomar ticket» puede seguir visible)
+    const api = incidentUrl.replace("/tickets/", "/api/v1/tickets/");
+    for (let i = 0; i < 50; i++) {
+      const j = await (await mgr.request.get(api)).json() as { status?: string; ticket?: { status?: string } };
+      if ((j.status ?? j.ticket?.status) === "RESOLVED") break;
+      if (i === 49) throw new Error("el ticket no quedó resuelto");
+      await mgr.waitForTimeout(200);
+    }
     await mgr.getByText("Resuelto").first().waitFor();
     await shot(mgr, "07-detalle-ticket-agente");
   });

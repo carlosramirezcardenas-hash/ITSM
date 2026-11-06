@@ -61,3 +61,17 @@ export function similarity(a: string, b: string) {
   for (const w of A) if (B.has(w)) inter++;
   return inter / (A.size + B.size - inter);
 }
+
+/**
+ * Coincidencia por raíces (primeros 5 caracteres) entre una consulta y un texto: cuánta parte de la consulta
+ * aparece en el texto. Tolera plurales y conjugaciones simples ("impresoras" ≈ "impresora").
+ */
+export function matchScore(query: string, text: string) {
+  const stem = (w: string) => w.slice(0, 5);
+  const Q = new Set([...tokens(query)].map(stem));
+  const T = new Set([...tokens(text)].map(stem));
+  if (!Q.size || !T.size) return 0;
+  let hit = 0;
+  for (const w of Q) if (T.has(w)) hit++;
+  return hit / Q.size;
+}

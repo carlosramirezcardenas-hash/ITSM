@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, Clock, KeyRound, LifeBuoy, PackagePlus, Wrench } from "lucide-react";
+import { ArrowRight, Clock, KeyRound, LifeBuoy, PackagePlus, Sparkles, Wrench } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireCtx } from "@/server/auth";
 import { DynIcon } from "@/components/icon";
@@ -20,7 +20,15 @@ export default async function NewPage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="text-2xl font-semibold tracking-tight">¿Qué necesitas?</h1>
       <p className="mt-1 text-sm text-muted">Elige una opción. Te tomará menos de 30 segundos.</p>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <Link href="/assistant" className="group mt-6 flex items-center gap-4 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-card p-5 transition hover:-translate-y-0.5 hover:shadow-sm dark:border-violet-900 dark:from-violet-950/60">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white"><Sparkles className="h-5 w-5" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium">No sé bien qué elegir</span>
+          <span className="mt-0.5 block text-sm text-muted">Cuéntaselo al asistente con tus palabras y te lleva al lugar correcto.</span>
+        </span>
+        <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-0.5" />
+      </Link>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {options.map((o) => (
           <Link key={o.title} href={o.href} className="group flex gap-4 rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-sm">
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${o.tone}`}><o.icon className="h-5 w-5" /></span>

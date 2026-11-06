@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  AlertTriangle, ArrowRight, BookOpen, CheckCircle2, Clock, HelpCircle, KeyRound, LifeBuoy, PackagePlus, Search, ShieldAlert, Star, Ticket, Timer, Wrench,
+  AlertTriangle, ArrowRight, BookOpen, CheckCircle2, Clock, HelpCircle, KeyRound, LifeBuoy, PackagePlus, ShieldAlert, Sparkles, Star, Ticket, Timer, Wrench,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -12,6 +12,9 @@ import { RiskList } from "@/components/risk-list";
 import { Badge, Card, CardHeader, EmptyState, Stat, buttonClass } from "@/components/ui";
 import { AgentTicketRow, SimpleTicketRow } from "@/components/ticket-list";
 import { TrendChart, ComplianceChart } from "@/components/charts";
+import { getExperience } from "@/server/experience";
+import { Carousel } from "@/components/carousel";
+import { ServiceTile } from "@/components/service-tiles";
 import { formatMinutes, ticketRef, timeAgo } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Inicio" };
@@ -22,6 +25,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const { denied } = await searchParams;
   const r = ctx.user.role;
   const banner = denied ? <p className="mb-4 rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">No tienes acceso a esa sección. Te trajimos al inicio.</p> : null;
+  if ((await getExperience(r)) === "employee") return <>{banner}<UserHome ctx={ctx} /></>;
   if (r === "ORG_ADMIN" || r === "SERVICE_MANAGER") return <>{banner}<ManagerHome ctx={ctx} /></>;
   if (r === "AGENT") return <>{banner}<AgentHome ctx={ctx} /></>;
   return <>{banner}<UserHome ctx={ctx} /></>;
@@ -34,13 +38,19 @@ const greeting = () => {
 
 // ============================================================ Usuario final
 async function UserHome({ ctx }: { ctx: Ctx }) {
-  const [open, recent, articles, approvals, toConfirm] = await Promise.all([
+  const [open, recent, articles, approvals, toConfirm, popular, catOrder] = await Promise.all([
     db.ticket.findMany({ where: { orgId: ctx.orgId, requesterId: ctx.user.id, status: { in: ["NEW", "ASSIGNED", "IN_PROGRESS", "PENDING"] } }, orderBy: { updatedAt: "desc" }, take: 6 }),
     db.ticket.findMany({ where: { orgId: ctx.orgId, requesterId: ctx.user.id, status: { in: ["CLOSED"] } }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.kbArticle.findMany({ where: { orgId: ctx.orgId, status: "PUBLISHED" }, orderBy: { views: "desc" }, take: 4, select: { slug: true, title: true, summary: true } }),
     can(ctx.user.role, "approvals:decide") ? db.approval.count({ where: { approverId: ctx.user.id, status: "PENDING", ticket: { orgId: ctx.orgId } } }) : 0,
     db.ticket.findMany({ where: { orgId: ctx.orgId, requesterId: ctx.user.id, status: "RESOLVED" }, orderBy: { resolvedAt: "desc" }, take: 3 }),
+    db.serviceItem.findMany({
+      where: { orgId: ctx.orgId, isActive: true }, orderBy: [{ popularity: "desc" }, { name: "asc" }], take: 10,
+      select: { id: true, name: true, description: true, icon: true, estimatedHours: true, requiresApproval: true, category: { select: { name: true } } },
+    }),
+    db.category.findMany({ where: { orgId: ctx.orgId }, orderBy: { name: "asc" }, select: { name: true } }),
   ]);
+  const order = catOrder.map((c) => c.name);
   const quick = [
     { href: "/new/issue", icon: Wrench, title: "Tengo un problema", desc: "Algo no funciona" },
     { href: "/catalog?c=access", icon: KeyRound, title: "Necesito acceso", desc: "Sistemas, carpetas, VPN" },
@@ -53,11 +63,12 @@ async function UserHome({ ctx }: { ctx: Ctx }) {
       <section className="rounded-2xl border border-border bg-gradient-to-br from-primary-soft via-card to-card px-6 py-10 text-center sm:px-10 sm:py-14">
         <p className="text-sm text-muted">{greeting()}, {ctx.user.name.split(" ")[0]} 👋</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">¿En qué podemos ayudarte?</h1>
-        <form action="/help" className="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-xl border border-border bg-card p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
-          <Search className="ml-2 h-4 w-4 shrink-0 text-muted" />
-          <input name="q" placeholder="Ej: no me funciona la VPN, olvidé mi contraseña…" className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted" aria-label="Buscar ayuda" />
-          <button className={buttonClass("secondary", "sm")}>Buscar</button>
+        <form action="/assistant" className="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-xl border border-border bg-card p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
+          <Sparkles className="ml-2 h-4 w-4 shrink-0 text-violet-500" />
+          <input name="q" required minLength={2} maxLength={1000} placeholder="Ej: no me funciona la VPN, necesito un notebook…" className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted" aria-label="Pregúntale al asistente" />
+          <button className={buttonClass("secondary", "sm")}>Preguntar</button>
         </form>
+        <p className="mt-2 text-xs text-muted">El asistente te muestra la solución, el servicio indicado o te deja el reporte listo para enviar.</p>
         <Link href="/new" className={buttonClass("primary", "lg", "mt-5")}>Crear solicitud <ArrowRight className="h-4 w-4" /></Link>
       </section>
 
@@ -96,6 +107,12 @@ async function UserHome({ ctx }: { ctx: Ctx }) {
           ))}
         </div>
       </section>
+
+      {popular.length > 0 && (
+        <Carousel title="Lo más pedido" subtitle="Elige y listo: sin formularios complicados" seeAll="/catalog">
+          {popular.map((s) => <ServiceTile key={s.id} s={s} order={order} />)}
+        </Carousel>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">
@@ -162,8 +179,8 @@ async function AgentHome({ ctx }: { ctx: Ctx }) {
         <Stat label="Tiempo medio resolución" value={formatMinutes(stats.mttr)} icon={<Clock className="h-4 w-4" />} />
         <Stat label="Satisfacción" value={stats.csat ? `${stats.csat.toFixed(1)}/5` : "—"} sub={`${stats.csatCount} evaluaciones`} icon={<Star className="h-4 w-4" />} />
       </div>
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="min-w-0 space-y-6 xl:col-span-2">
           <Card>
             <CardHeader title="Riesgo de incumplir el SLA" description="Predicción según tiempo consumido, carga y estado · tuyos y de tus equipos" action={<Link href="/queue?view=breaching" className="text-xs text-primary hover:underline">Ver todos</Link>} />
             <RiskList items={atRisk} />
@@ -174,7 +191,7 @@ async function AgentHome({ ctx }: { ctx: Ctx }) {
               <div className="divide-y divide-border">{mine.map((t) => <AgentTicketRow key={t.id} t={t} showAssignee={false} />)}</div>}
           </Card>
         </div>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader title="Sin asignar en mis equipos" />
             {unassigned.length === 0 ? <p className="px-5 py-6 text-center text-sm text-muted">Nada pendiente 🎉</p> :

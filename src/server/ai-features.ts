@@ -16,7 +16,7 @@ const strArr = { type: "array", items: { type: "string" } };
 
 // Límite por usuario para evitar abuso/costos (en memoria por instancia)
 const hits = new Map<string, number[]>();
-function throttle(userId: string, max = 30, windowMs = 10 * 60_000) {
+export function throttle(userId: string, max = 30, windowMs = 10 * 60_000) {
   const now = Date.now();
   const list = (hits.get(userId) ?? []).filter((t) => now - t < windowMs);
   if (list.length >= max) throw new AppError("RATE_LIMIT", "Usaste muchas veces la IA en poco tiempo. Espera unos minutos.");

@@ -18,6 +18,7 @@
     "test:e2e": "tsx tests/e2e/smoke.ts",
     "test:e2e:2": "tsx tests/e2e/phase2.ts",
     "test:e2e:3": "tsx tests/e2e/phase3.ts",
+    "test:e2e:x": "tsx tests/e2e/experience.ts",
     "mock:anthropic": "tsx tests/mock-anthropic.ts"
   },
   "prisma": {

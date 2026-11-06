@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { EXPERIENCE_COOKIE, canUseOps } from "@/server/experience";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { createPasswordReset, getCtx, getSessionUser, hashPassword, login, logout, resetPassword, validatePasswordStrength } from "@/server/auth";
@@ -38,6 +40,15 @@ export async function loginAction(_: unknown, form: FormData): Promise<ActionRes
 export async function logoutAction() {
   await logout();
   redirect("/login");
+}
+
+/** Cambia entre el Portal del empleado y Operaciones TI (solo el equipo de TI puede ir a Operaciones). */
+export async function setExperienceAction(mode: "employee" | "ops") {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  const target = mode === "ops" && canUseOps(user.role) ? "ops" : "employee";
+  (await cookies()).set(EXPERIENCE_COOKIE, target, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  redirect("/home");
 }
 
 export async function forgotPasswordAction(_: unknown, form: FormData): Promise<ActionResult<{ demoLink?: string }>> {

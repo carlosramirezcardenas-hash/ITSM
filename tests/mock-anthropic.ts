@@ -15,6 +15,7 @@ function gen(schema: any, key = ""): unknown {
     case "object": return Object.fromEntries(Object.entries(schema.properties ?? {}).map(([k, v]) => [k, gen(v, k)]));
     case "array": return [gen(schema.items, key), gen(schema.items, key)];
     case "number": return 0.9;
+    case "integer": return 1;
     case "boolean": return true;
     default: return key.includes("id") ? "id-de-prueba" : `Respuesta simulada (${key || "texto"}).`;
   }

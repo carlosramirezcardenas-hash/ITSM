@@ -110,6 +110,20 @@ async function main() {
     ticketUrl = new URL(ana.url()).pathname;
     // La actividad de automatización solo la ve el equipo de soporte: se verifica en el paso siguiente
   });
+  await step("Asistente conversacional con IA: responde y deja el reporte para confirmar", async () => {
+    const before = (await stats()).messages;
+    await ana.goto("/assistant");
+    await ana.getByText("Con IA:").waitFor();
+    await ana.getByLabel("Mensaje para el asistente").fill("El sistema de bodega no me deja ingresar");
+    await ana.getByRole("button", { name: "Enviar mensaje" }).click();
+    await ana.getByText("Respuesta simulada (reply).").waitFor({ timeout: 15000 });
+    await ana.getByText("Respuestas generadas por IA").waitFor();
+    assert.equal(await ana.getByLabel("Título del reporte").inputValue(), "Respuesta simulada (ticket_title).");
+    assert.equal((await stats()).messages, before + 1);
+    // Los id inventados por el modelo se descartan (no existe "id-de-prueba")
+    assert.equal(await ana.getByRole("link", { name: "Solicitar", exact: true }).count(), 0);
+    await shot(ana, "p3-02b-asistente-ia");
+  });
   const cam = await session("camila@andes.demo");
   await step("Agente ve sugerencia de IA, resume y redacta respuesta", async () => {
     await cam.goto(ticketUrl);
@@ -175,6 +189,12 @@ async function main() {
     await cam.goto(ticketUrl);
     await cam.getByText("No está activo en esta organización").waitFor();
     assert.equal(await cam.getByRole("button", { name: "Sugerir respuesta" }).count(), 0);
+    // El asistente del portal sigue funcionando en modo básico
+    await ana.goto("/assistant");
+    await ana.getByLabel("Mensaje para el asistente").fill("necesito un notebook nuevo");
+    await ana.getByRole("button", { name: "Enviar mensaje" }).click();
+    await ana.getByText("Para eso tenemos el servicio «Solicitar un notebook»").waitFor({ timeout: 15000 });
+    await ana.getByText("Modo básico").waitFor();
     await adm.getByRole("button", { name: "Activar" }).click();
     await toast(adm, "Asistente de IA activado.");
   });

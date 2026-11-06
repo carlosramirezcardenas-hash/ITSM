@@ -5,11 +5,28 @@ import { ROLE_LABEL } from "@/lib/labels";
 import { AppShell, type NavSection } from "@/components/app-shell";
 import { after } from "next/server";
 import { maybeRunSlaSweep } from "@/server/sla";
+import { PortalShell, type PortalNavItem } from "@/components/portal-shell";
+import { canUseOps, getExperience } from "@/server/experience";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   after(() => maybeRunSlaSweep().catch((e) => console.error("[sla-sweep]", e)));
   const sections: NavSection[] = [];
+  const shellUser = { name: user.name, email: user.email, roleLabel: ROLE_LABEL[user.role]!, orgName: user.orgName };
+
+  if (user.role !== "SUPER_ADMIN" && (await getExperience(user.role)) === "employee") {
+    // Portal del empleado: solo lo que una persona necesita para pedir ayuda y seguir lo que pidió.
+    const pendingApprovals = can(user.role, "approvals:decide")
+      ? await db.approval.count({ where: { approverId: user.id, status: "PENDING", ticket: { orgId: user.orgId! } } }) : 0;
+    const items: PortalNavItem[] = [
+      { href: "/home", label: "Inicio", icon: "home" },
+      { href: "/catalog", label: "Servicios", icon: "grid" },
+      { href: "/my-requests", label: "Mis solicitudes", icon: "list" },
+      ...(can(user.role, "approvals:decide") ? [{ href: "/approvals", label: "Aprobaciones", icon: "check" as const, badge: pendingApprovals }] : []),
+      { href: "/help", label: "Ayuda", icon: "book" },
+    ];
+    return <PortalShell items={items} user={shellUser} canSwitch={canUseOps(user.role)}>{children}</PortalShell>;
+  }
 
   if (user.role === "SUPER_ADMIN") {
     sections.push({ items: [{ href: "/platform", label: "Organizaciones", icon: "building" }] });
@@ -54,7 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell sections={sections} user={{ name: user.name, email: user.email, roleLabel: ROLE_LABEL[user.role]!, orgName: user.orgName }}>
+    <AppShell sections={sections} user={shellUser} canSwitch={user.role !== "SUPER_ADMIN" && canUseOps(user.role)}>
       {children}
     </AppShell>
   );
