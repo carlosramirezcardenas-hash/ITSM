@@ -27,19 +27,24 @@ export function NotificationBell() {
 
   useEffect(() => {
     load();
-    // Tiempo real vía Server-Sent Events
+    // Tiempo real vía Server-Sent Events. El servidor cierra la conexión periódicamente (serverless):
+    // reconectamos indicando el último evento recibido para no perder notificaciones.
     let es: EventSource | null = null;
     let retry: ReturnType<typeof setTimeout>;
+    let last = Date.now();
+    let failures = 0;
     const connect = () => {
-      es = new EventSource("/api/v1/notifications/stream");
+      es = new EventSource(`/api/v1/notifications/stream?since=${last}`);
+      es.addEventListener("ready", () => { failures = 0; });
       es.addEventListener("notification", (e) => {
         const n = JSON.parse((e as MessageEvent).data) as N;
+        last = Math.max(last, new Date(n.createdAt).getTime());
         setItems((xs) => [n, ...xs.filter((x) => x.id !== n.id)].slice(0, 20));
         setUnread((u) => u + 1);
         push({ kind: n.kind === "danger" ? "error" : n.kind === "success" ? "success" : n.kind === "warning" ? "warning" : "info", title: n.title, body: n.body ?? undefined, link: n.link ?? undefined });
         router.refresh();
       });
-      es.onerror = () => { es?.close(); retry = setTimeout(connect, 10000); };
+      es.onerror = () => { es?.close(); failures++; retry = setTimeout(connect, Math.min(30000, 1500 * failures)); };
     };
     connect();
     return () => { es?.close(); clearTimeout(retry); };

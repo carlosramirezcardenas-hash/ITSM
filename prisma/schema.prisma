@@ -700,3 +700,9 @@ model WorkLog {
 
   @@index([entityType, entityId])
 }
+
+// Control de tareas periódicas en entornos serverless (evita ejecuciones duplicadas entre instancias)
+model JobLock {
+  name      String   @id
+  lastRunAt DateTime
+}

@@ -61,13 +61,12 @@ export function RcaEditor({ id, initial, disabled }: { id: string; initial: { rc
 }
 
 type Task = { id: string; title: string; owner: string | null; dueDate: string | null; done: boolean };
-export function Tasks({ problemId, tasks, staff, disabled }: { problemId: string; tasks: Task[]; staff: { id: string; name: string }[]; disabled: boolean }) {
+export function Tasks({ problemId, tasks, staff, disabled, today }: { problemId: string; tasks: Task[]; staff: { id: string; name: string }[]; disabled: boolean; today: string }) {
   const [f, setF] = useState({ title: "", ownerId: "", dueDate: "" });
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({}); // respuesta inmediata al marcar
   const [pending, start] = useTransition();
   const toast = useActionToast();
   const router = useRouter();
-  const today = new Date().toISOString().slice(0, 10);
   const go = (fn: () => Promise<any>, after?: () => void) => start(async () => { const r = toast(await fn()); if (r.ok) { after?.(); router.refresh(); } });
   const isDone = (t: Task) => optimistic[t.id] ?? t.done;
   const done = tasks.filter(isDone).length;

@@ -7,9 +7,8 @@ import { Avatar, Badge, Button, Card, Field, Input, Select } from "@/components/
 import { Modal } from "@/components/modal";
 import { useActionToast } from "@/components/toast";
 import { ROLE_LABEL } from "@/lib/labels";
-import { timeAgo } from "@/lib/utils";
 
-type U = { id: string; name: string; email: string; role: string; title: string | null; departmentId: string | null; department: string | null; managerId: string | null; manager: string | null; isActive: boolean; lastLoginAt: string | null; teamIds: string[]; teams: string[] };
+type U = { id: string; name: string; email: string; role: string; title: string | null; departmentId: string | null; department: string | null; managerId: string | null; manager: string | null; isActive: boolean; lastLogin: string; teamIds: string[]; teams: string[] };
 const ROLES = ["END_USER", "APPROVER", "AGENT", "SERVICE_MANAGER", "ORG_ADMIN"] as const;
 const ROLE_HINT: Record<string, string> = {
   END_USER: "Pide ayuda y sigue sus solicitudes.",
@@ -58,7 +57,7 @@ export function UsersClient({ users, departments, teams, people, q, me }: { user
                 <td className="px-5 py-3"><div className="flex items-center gap-3"><Avatar name={u.name} size={30} /><div><p className="font-medium">{u.name} {!u.isActive && <Badge tone="red">Inactivo</Badge>}</p><p className="text-xs text-muted">{u.email}</p></div></div></td>
                 <td className="px-3"><Badge tone={u.role === "ORG_ADMIN" ? "violet" : u.role === "AGENT" || u.role === "SERVICE_MANAGER" ? "blue" : u.role === "APPROVER" ? "amber" : "slate"}>{ROLE_LABEL[u.role]}</Badge></td>
                 <td className="px-3 text-xs text-muted">{u.department ?? "—"}{u.teams.length ? ` · ${u.teams.join(", ")}` : ""}</td>
-                <td className="px-3 text-xs text-muted">{u.lastLoginAt ? timeAgo(u.lastLoginAt) : "Nunca"}</td>
+                <td className="px-3 text-xs text-muted">{u.lastLogin}</td>
                 <td className="px-5 text-right"><Button size="sm" variant="ghost" onClick={() => open(u)}>Editar</Button></td>
               </tr>
             ))}
