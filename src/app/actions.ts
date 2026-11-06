@@ -45,7 +45,12 @@ export async function forgotPasswordAction(_: unknown, form: FormData): Promise<
     const email = z.string().trim().email("Ingresa un correo válido.").parse(form.get("email"));
     const token = await createPasswordReset(email);
     const link = token ? `/reset-password?token=${token}` : undefined;
-    if (link) console.info(`[password-reset] ${email}: ${process.env.APP_URL ?? ""}${link}`);
+    if (link) {
+      const { emailConfigured, renderEmail, sendEmail } = await import("@/server/email");
+      if (emailConfigured()) {
+        await sendEmail(email, "Restablece tu contraseña", renderEmail("Restablece tu contraseña", "Recibimos una solicitud para crear una contraseña nueva. El enlace vence en 30 minutos. Si no fuiste tú, ignora este correo.", { label: "Crear contraseña nueva", url: `${process.env.APP_URL ?? ""}${link}` }));
+      } else console.info(`[password-reset] enlace generado para ${email} (correo no configurado)`);
+    }
     // Sin servicio de correo aún (Fase 3): en modo demo mostramos el enlace en pantalla.
     return { ok: true, message: "Si el correo está registrado, enviamos un enlace para restablecer tu contraseña.", data: process.env.DEMO_MODE === "true" ? { demoLink: link } : {} };
   } catch (e) {

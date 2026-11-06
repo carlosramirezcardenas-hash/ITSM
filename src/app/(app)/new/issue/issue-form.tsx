@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, BookOpen, CheckCircle2, Sparkles } from "lucide-react";
 import { createIncidentAction, suggestAction } from "@/app/actions";
+import { aiSelfHelpAction } from "@/app/actions-ai";
 import { Button, Card, Field, Input, Select, Textarea, buttonClass } from "@/components/ui";
 import { useActionToast } from "@/components/toast";
 import { IMPACT_USER_LABEL, URGENCY_USER_LABEL } from "@/lib/labels";
@@ -25,7 +26,11 @@ function Choice({ value, onChange, labels, name }: { value: Level; onChange: (v:
   );
 }
 
-export function IssueForm({ staff, users, categories, me }: { staff: boolean; users: { id: string; name: string; email: string }[]; categories: { id: string; name: string }[]; me: string }) {
+type Help = { answer: string; articles: { slug: string; title: string }[]; resolvedLikely: boolean };
+
+export function IssueForm({ staff, users, categories, me, aiOn = false }: { staff: boolean; users: { id: string; name: string; email: string }[]; categories: { id: string; name: string }[]; me: string; aiOn?: boolean }) {
+  const [help, setHelp] = useState<Help | null>(null);
+  const [asking, startAsk] = useTransition();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [impact, setImpact] = useState<Level>("LOW");
@@ -123,6 +128,25 @@ export function IssueForm({ staff, users, categories, me }: { staff: boolean; us
           </form>
         </Card>
         <aside className="space-y-4">
+          {aiOn && !staff && (
+            <Card className="border-violet-200 p-4 dark:border-violet-900">
+              <p className="flex items-center gap-1.5 text-sm font-medium"><Sparkles className="h-4 w-4 text-violet-500" />¿Lo intentamos resolver ahora?</p>
+              {!help ? (
+                <>
+                  <p className="mt-0.5 text-xs text-muted">El asistente busca la solución en las guías de tu empresa.</p>
+                  <Button size="sm" variant="outline" className="mt-3" loading={asking} disabled={`${title} ${description}`.trim().length < 6}
+                    onClick={() => startAsk(async () => { const r = toast(await aiSelfHelpAction(`${title}\n${description}`)); if (r.ok && r.data) setHelp(r.data as Help); })}>Pedir ayuda a la IA</Button>
+                </>
+              ) : (
+                <div className="mt-2 space-y-2 text-sm">
+                  {help.answer ? <p className="whitespace-pre-line">{help.answer}</p> : <p className="text-muted">No encontramos una guía para esto. Envía tu reporte y el equipo te ayudará.</p>}
+                  {help.articles.map((a) => <Link key={a.slug} href={`/help/${a.slug}`} target="_blank" className="flex items-center gap-1.5 text-xs text-primary hover:underline"><BookOpen className="h-3 w-3" />{a.title}</Link>)}
+                  <p className="text-[11px] text-muted">Respuesta generada por IA a partir del centro de ayuda. Si no se resolvió, envía tu reporte.</p>
+                  {help.resolvedLikely && <Link href="/home" className={buttonClass("outline", "sm")}>Se resolvió, no necesito ayuda</Link>}
+                </div>
+              )}
+            </Card>
+          )}
           {suggest?.articles.length ? (
             <Card className="animate-in border-primary/30 p-4">
               <p className="flex items-center gap-1.5 text-sm font-medium"><Sparkles className="h-4 w-4 text-primary" />¿Esto te ayuda?</p>

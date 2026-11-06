@@ -24,6 +24,8 @@ export type SessionUser = {
   orgId: string | null;
   orgName: string | null;
   sessionId: string;
+  /** Presente cuando la petición se autenticó con una clave de API (solo /api/v1). */
+  apiKeyScope?: "read" | "read_write";
 };
 
 /** Contexto de tenant: toda operación de negocio recibe esto y filtra por orgId. */
@@ -130,6 +132,10 @@ export async function logout() {
 
 /** Usuario de la sesión actual (memoizado por request). */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
+  const h = await headers();
+  const bearer = h.get("authorization")?.match(/^Bearer (itsm_[A-Za-z0-9_-]{20,})$/)?.[1];
+  // Las claves de API solo valen en la API REST: el middleware marca esas rutas (y elimina la marca si viene del cliente)
+  if (bearer && h.get("x-itsm-api-route") === "1") return apiKeyUser(bearer);
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const s = await db.session.findUnique({
@@ -202,4 +208,13 @@ export async function resetPassword(token: string, newPassword: string) {
     db.session.deleteMany({ where: { userId: rec.userId } }), // cierra todas las sesiones
   ]);
   await audit({ orgId: rec.user.orgId, actor: rec.user, action: "auth.password_reset", entity: "user", entityId: rec.userId });
+}
+
+async function apiKeyUser(key: string): Promise<SessionUser | null> {
+  const k = await db.apiKey.findUnique({ where: { keyHash: sha256(key) }, include: { createdBy: { include: { org: { select: { name: true, isActive: true } } } } } });
+  if (!k || k.revokedAt || (k.expiresAt && k.expiresAt < new Date())) return null;
+  const u = k.createdBy;
+  if (!u.isActive || !u.orgId || u.orgId !== k.orgId || (u.org && !u.org.isActive)) return null;
+  if (!k.lastUsedAt || Date.now() - k.lastUsedAt.getTime() > 60_000) await db.apiKey.update({ where: { id: k.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+  return { id: u.id, name: u.name, email: u.email, role: u.role, orgId: u.orgId, orgName: u.org?.name ?? null, sessionId: `apikey:${k.id}`, apiKeyScope: k.scope === "read_write" ? "read_write" : "read" };
 }

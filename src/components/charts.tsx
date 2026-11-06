@@ -100,3 +100,23 @@ export function ComplianceChart({ data }: { data: { name: string; compliance: nu
     </div>
   );
 }
+
+/** Pronóstico: barras con el valor esperado y rango (tooltip). */
+export function ForecastChart({ data }: { data: { label: string; expected: number; low: number; high: number }[] }) {
+  const c = usePalette();
+  return (
+    <div className="h-48" role="img" aria-label="Pronóstico de tickets para los próximos 7 días">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke={c.grid} />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: c.axis }} tickLine={false} axisLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: c.axis }} tickLine={false} axisLine={false} allowDecimals={false} />
+          <Tooltip cursor={{ fill: c.grid, opacity: 0.5 }} content={({ active, payload, label }) => active && payload?.length ? (
+            <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg"><p className="mb-1 font-medium">{label}</p><p className="text-muted">Esperado: <span className="font-medium text-fg">{(payload[0]!.payload as { expected: number }).expected}</span></p><p className="text-muted">Rango: {(payload[0]!.payload as { low: number }).low} – {(payload[0]!.payload as { high: number }).high}</p></div>
+          ) : null} />
+          <Bar dataKey="expected" name="Esperado" fill={c.s1} radius={[4, 4, 0, 0]} maxBarSize={32} animationDuration={500} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

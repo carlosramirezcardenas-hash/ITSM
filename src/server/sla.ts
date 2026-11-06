@@ -70,6 +70,7 @@ export async function runSlaSweep(now = new Date()) {
     if (total > 0 && used / total >= warn) {
       await db.ticket.update({ where: { id: t.id }, data: { slaWarned: true } });
       const to = t.assigneeId ? [t.assigneeId] : await teamMemberIds(t.teamId);
+      await runHooks(t.orgId, "sla.warning", t);
       await notify(t.orgId, to, {
         kind: "warning",
         title: `SLA por vencer: ${ticketRef(t.type, t.number)}`,
@@ -109,6 +110,7 @@ export async function runSlaSweep(now = new Date()) {
     await notify(t.orgId, [t.assigneeId, ...leads, ...managers], {
       kind: "danger", title: `SLA vencido y escalado: ${ticketRef(t.type, t.number)}`, body: t.title, link: `/tickets/${t.id}`,
     });
+    await runHooks(t.orgId, "sla.breached", t);
     stats.resolutionBreached++;
   }
 
@@ -143,4 +145,15 @@ export async function maybeRunSlaSweep(minIntervalMs = 60_000) {
   });
   if (claimed.count === 0) return null;
   return runSlaSweep();
+}
+
+async function runHooks(orgId: string, trigger: "sla.warning" | "sla.breached", t: { id: string; type: string; number: number; title: string; priority: string }) {
+  try {
+    const { runAutomations } = await import("./automation");
+    await runAutomations(orgId, trigger, t.id);
+    if (trigger === "sla.breached") {
+      const { dispatch } = await import("./integrations");
+      await dispatch(orgId, "sla.breached", { title: `${ticketRef(t.type, t.number)} · ${t.title}`, text: `Se venció el SLA de resolución (prioridad ${t.priority}).`, link: `/tickets/${t.id}` });
+    }
+  } catch (e) { console.error("[sla-hooks]", e); }
 }

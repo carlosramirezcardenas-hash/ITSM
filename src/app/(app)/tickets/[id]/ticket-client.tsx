@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, CheckCircle2, Hand, Lock, PauseCircle, Play, RotateCcw, Send, Star, XCircle } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Hand, Lock, PauseCircle, Play, RotateCcw, Send, Sparkles, Star, XCircle } from "lucide-react";
+import { aiSuggestReplyAction } from "@/app/actions-ai";
 import { commentAction, confirmResolutionAction, escalateAction, updateTicketAction } from "@/app/actions";
 import { Button, Card, Field, Select, Textarea } from "@/components/ui";
 import { Modal } from "@/components/modal";
@@ -154,15 +155,21 @@ export function StaffPanel({ ticket: t, next, teams, agents, categories, me }: {
   );
 }
 
-export function Composer({ ticketId, staff }: { ticketId: string; staff: boolean }) {
+export function Composer({ ticketId, staff, aiOn = false }: { ticketId: string; staff: boolean; aiOn?: boolean }) {
   const [body, setBody] = useState("");
   const [internal, setInternal] = useState(false);
+  const [drafted, setDrafted] = useState(false);
+  const [drafting, startDraft] = useTransition();
   const [pending, start] = useTransition();
   const toast = useActionToast();
   const router = useRouter();
   const send = () => start(async () => {
     const r = toast(await commentAction(ticketId, { body, isInternal: internal }));
-    if (r.ok) { setBody(""); router.refresh(); }
+    if (r.ok) { setBody(""); setDrafted(false); router.refresh(); }
+  });
+  const draft = () => startDraft(async () => {
+    const r = toast(await aiSuggestReplyAction(ticketId));
+    if (r.ok && r.data) { setInternal(false); setBody((r.data as { reply: string }).reply); setDrafted(true); }
   });
   return (
     <Card className={cn("p-3", internal && "border-amber-300 dark:border-amber-800")}>
@@ -170,11 +177,13 @@ export function Composer({ ticketId, staff }: { ticketId: string; staff: boolean
         <div className="mb-2 flex gap-1 text-xs">
           <button type="button" onClick={() => setInternal(false)} className={cn("rounded-md px-2.5 py-1", !internal ? "bg-subtle font-medium" : "text-muted")}>Responder al usuario</button>
           <button type="button" onClick={() => setInternal(true)} className={cn("flex items-center gap-1 rounded-md px-2.5 py-1", internal ? "bg-amber-100 font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200" : "text-muted")}><Lock className="h-3 w-3" />Nota interna</button>
+          {aiOn && <button type="button" onClick={draft} disabled={drafting} className="ml-auto flex items-center gap-1 rounded-md px-2.5 py-1 text-violet-600 hover:bg-violet-50 disabled:opacity-50 dark:text-violet-400 dark:hover:bg-violet-950"><Sparkles className="h-3 w-3" />{drafting ? "Redactando…" : "Sugerir respuesta"}</button>}
         </div>
       )}
       <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} className="border-0 px-1 focus:ring-0" aria-label="Mensaje"
         placeholder={internal ? "Solo visible para el equipo de soporte…" : staff ? "Escribe una respuesta para el usuario…" : "Escribe un mensaje al equipo de soporte…"}
         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && body.trim()) send(); }} />
+      {drafted && <p className="px-1 text-[11px] text-violet-600 dark:text-violet-400">Borrador generado por IA: revísalo y edítalo antes de enviar.</p>}
       <div className="flex items-center justify-between pt-2">
         <span className="hidden text-[11px] text-muted sm:block">Ctrl/⌘ + Enter para enviar</span>
         <Button size="sm" onClick={send} loading={pending} disabled={!body.trim()} className="ml-auto"><Send className="h-3.5 w-3.5" />Enviar</Button>

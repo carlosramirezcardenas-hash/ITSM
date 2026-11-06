@@ -210,8 +210,44 @@ base de conocimientos.
 Permisos nuevos: `problems:manage` (agentes, gestores, admin), `changes:create` (ídem), `changes:approve` (CAB:
 gestores y admin), `cmdb:view` (agentes) y `cmdb:manage` (gestores y admin). Lógica pura y probada en `src/lib/itsm.ts`.
 
-### Aún NO implementado (sin botones ni pantallas falsas)
-- **Fase 3**: asistente IA (resúmenes, respuestas sugeridas, causa raíz), automatizaciones configurables por el usuario,
-  análisis predictivo, correo electrónico (los enlaces de recuperación se muestran en pantalla solo en `DEMO_MODE`),
-  Microsoft Teams, SSO, API keys e importación/descubrimiento automático de la CMDB, adjuntos de archivos.
-- Fuera de alcance por ahora: congelamientos de cambios (*freeze windows*), CAB con votación por mayoría, diagrama gráfico de la CMDB.
+### Fase 3 — Inteligencia y automatización ✅ implementada y probada
+- **Asistente de IA (Claude, `claude-opus-5-5`)** — `src/server/ai.ts`, `src/server/ai-features.ts`:
+  - *Clasificación y prioridad* de cada incidente nuevo (tras responder al usuario, con `after()`): sugiere categoría,
+    impacto, urgencia y artículos con su justificación y confianza. Solo aplica sola la **categoría** (enrutamiento) si la
+    regla de palabras clave no encontró ninguna y la confianza es ≥ 80 %; la prioridad siempre la confirma un agente
+    («Aplicar sugerencia»).
+  - *Resumen* de tickets largos, *respuesta sugerida* para el agente (borrador que se revisa antes de enviar, basado en
+    la base de conocimientos y en la solución temporal del error conocido), *hipótesis de causa raíz* para problemas
+    (usa incidentes, CMDB y cambios recientes), *análisis de tendencias* para gestores y *autoayuda* para usuarios en el
+    portal (responde solo con lo que dicen los artículos).
+  - Salidas estructuradas con esquema JSON, `effort` según la tarea (bajo para clasificar, alto para causa raíz),
+    *fallback* del lado del servidor ante rechazos por política (`server-side-fallback-2026-07-01`, `fallbacks: "default"`),
+    manejo de `refusal`/`max_tokens` y errores tipados del SDK, límite de uso por persona y registro de consumo
+    (`AiUsage`) visible en Integraciones e IA. La organización puede desactivarla.
+  - Privacidad: los campos sensibles (cifrados) nunca se envían; tendencias usa solo agregados; el texto de usuarios va
+    delimitado como datos (mitiga *prompt injection*).
+- **Automatizaciones** (`src/lib/automation.ts` + `src/server/automation.ts`): reglas «cuando… si… entonces…» con
+  disparadores *ticket creado / reabierto / SLA por vencer / SLA vencido*, condiciones (tipo, prioridad, impacto, urgencia,
+  categoría, equipo, canal, texto, área) y acciones (derivar a equipo con asignación por carga, asignar, cambiar prioridad
+  recalculando el SLA, notificar, escalar, nota interna). Quedan registradas en la actividad del ticket; los cambios de
+  una automatización no vuelven a disparar reglas.
+- **Análisis predictivo** (`src/lib/predict.ts`, modelos explicables, no IA generativa): pronóstico de tickets a 7 días
+  (estacionalidad semanal × tendencia de 14 días) comparado con la capacidad observada, y **riesgo de incumplir el SLA**
+  (0-100) por ticket según tiempo consumido, responsable, carga y estado — en Reportes y en el inicio del agente.
+- **Integraciones** (`src/server/integrations.ts`): Microsoft Teams (Adaptive Card), Slack y webhooks JSON firmados con
+  HMAC-SHA256 (`x-itsm-signature`, `x-itsm-timestamp`) para eventos de tickets, SLA, cambios y errores conocidos; URLs
+  cifradas en BD, protección SSRF (solo HTTPS a hosts públicos), botón de prueba e historial de entregas.
+- **Claves de API** para la API REST: se guarda solo el hash, se muestran una vez, alcance *solo lectura* o *lectura y
+  escritura*, vencimiento y revocación; actúan con los permisos de su creador y **solo** son válidas en `/api/v1`
+  (el middleware marca esas rutas; no abren la interfaz ni las acciones del servidor).
+- **Correo** (Resend, opcional): recuperación de contraseña y avisos que requieren acción (aprobaciones de solicitudes y
+  cambios). Sin configurar, los avisos siguen llegando dentro de la app.
+
+Pruebas: la IA se prueba de punta a punta contra `tests/mock-anthropic.ts`, que **valida cada petición** (modelo, beta
+de fallback, salida estructurada estricta, sin parámetros retirados como `temperature` o `budget_tokens`, sin *prefill*)
+y responde datos que cumplen el esquema. Las llamadas reales al modelo no se pudieron ejecutar en el entorno de
+desarrollo (sin clave); se habilitan al definir `ANTHROPIC_API_KEY`.
+
+### Aún NO implementado
+- Inicio de sesión único (SSO / Entra ID), creación de tickets desde correos entrantes, adjuntos de archivos,
+  descubrimiento automático de la CMDB, aprobación de cambios desde Teams, congelamientos de cambios y CAB por mayoría.

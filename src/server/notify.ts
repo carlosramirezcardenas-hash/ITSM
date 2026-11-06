@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 
-export type NotifyInput = { title: string; body?: string; link?: string; kind?: "info" | "success" | "warning" | "danger" };
+export type NotifyInput = { title: string; body?: string; link?: string; kind?: "info" | "success" | "warning" | "danger"; email?: boolean };
 
 /** Crea notificaciones in-app (el canal SSE las entrega en tiempo real). */
 export async function notify(orgId: string, userIds: (string | null | undefined)[], n: NotifyInput, exceptUserId?: string) {
@@ -9,7 +9,15 @@ export async function notify(orgId: string, userIds: (string | null | undefined)
   await db.notification.createMany({
     data: ids.map((userId) => ({ orgId, userId, title: n.title, body: n.body, link: n.link, kind: n.kind ?? "info" })),
   });
-  // Punto de extensión (Fase 3): correo electrónico y Microsoft Teams.
+  // Correo para avisos que requieren acción (aprobaciones, incidentes críticos), si está configurado
+  if (n.email) {
+    const { emailConfigured, renderEmail, sendEmail } = await import("./email");
+    if (emailConfigured()) {
+      const users = await db.user.findMany({ where: { id: { in: ids }, isActive: true }, select: { email: true } });
+      const url = `${process.env.APP_URL ?? ""}${n.link ?? "/home"}`;
+      await Promise.all(users.map((u) => sendEmail(u.email, n.title, renderEmail(n.title, n.body ?? "", { label: "Abrir en ITSM Easy", url }))));
+    }
+  }
 }
 
 export async function teamMemberIds(teamId: string | null | undefined, leadsOnly = false) {

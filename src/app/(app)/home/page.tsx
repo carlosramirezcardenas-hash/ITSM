@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { requireCtx, type Ctx } from "@/server/auth";
 import { agentStats, getMetrics } from "@/server/metrics";
+import { riskRanking } from "@/server/predictive";
+import { RiskList } from "@/components/risk-list";
 import { Badge, Card, CardHeader, EmptyState, Stat, buttonClass } from "@/components/ui";
 import { AgentTicketRow, SimpleTicketRow } from "@/components/ticket-list";
 import { TrendChart, ComplianceChart } from "@/components/charts";
@@ -134,14 +136,11 @@ async function AgentHome({ ctx }: { ctx: Ctx }) {
   const teamIds = (await db.teamMember.findMany({ where: { userId: ctx.user.id }, select: { teamId: true } })).map((t) => t.teamId);
   const open = { in: ["NEW", "ASSIGNED", "IN_PROGRESS", "PENDING"] as ("NEW" | "ASSIGNED" | "IN_PROGRESS" | "PENDING")[] };
   const inc = { requester: { select: { name: true } }, assignee: { select: { name: true } } };
-  const [stats, mine, unassigned, dueSoon, activity] = await Promise.all([
+  const [stats, mine, unassigned, atRisk, activity] = await Promise.all([
     agentStats(ctx),
     db.ticket.findMany({ where: { orgId: ctx.orgId, assigneeId: ctx.user.id, status: open }, include: inc, orderBy: [{ priority: "asc" }, { createdAt: "asc" }], take: 8 }),
     db.ticket.findMany({ where: { orgId: ctx.orgId, assigneeId: null, teamId: { in: teamIds }, status: open, approvalStatus: { not: "PENDING" } }, include: inc, orderBy: [{ priority: "asc" }, { createdAt: "asc" }], take: 5 }),
-    db.ticket.findMany({
-      where: { orgId: ctx.orgId, status: { in: ["NEW", "ASSIGNED", "IN_PROGRESS"] }, slaPausedAt: null, OR: [{ assigneeId: ctx.user.id }, { teamId: { in: teamIds } }], resolutionDueAt: { lt: new Date(Date.now() + 8 * 3600_000) } },
-      include: inc, orderBy: { resolutionDueAt: "asc" }, take: 6,
-    }),
+    riskRanking(ctx, { assigneeId: ctx.user.id, teamIds, take: 6 }),
     db.ticketActivity.findMany({ where: { ticket: { orgId: ctx.orgId, OR: [{ assigneeId: ctx.user.id }, { teamId: { in: teamIds } }] } }, include: { actor: { select: { name: true } }, ticket: { select: { id: true, number: true, type: true, title: true } } }, orderBy: { createdAt: "desc" }, take: 8 }),
   ]);
   return (
@@ -166,9 +165,8 @@ async function AgentHome({ ctx }: { ctx: Ctx }) {
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card>
-            <CardHeader title="SLA próximos a vencer" description="Vencidos o que vencen en las próximas 8 horas" action={<Link href="/queue?view=breaching" className="text-xs text-primary hover:underline">Ver todos</Link>} />
-            {dueSoon.length === 0 ? <EmptyState icon={<CheckCircle2 className="h-5 w-5" />} title="Todo en tiempo" description="No hay SLA en riesgo en tus equipos." /> :
-              <div className="divide-y divide-border">{dueSoon.map((t) => <AgentTicketRow key={t.id} t={t} />)}</div>}
+            <CardHeader title="Riesgo de incumplir el SLA" description="Predicción según tiempo consumido, carga y estado · tuyos y de tus equipos" action={<Link href="/queue?view=breaching" className="text-xs text-primary hover:underline">Ver todos</Link>} />
+            <RiskList items={atRisk} />
           </Card>
           <Card>
             <CardHeader title="Mis tickets asignados" description="Ordenados por prioridad" action={<Link href="/queue?view=mine" className="text-xs text-primary hover:underline">Abrir bandeja</Link>} />
