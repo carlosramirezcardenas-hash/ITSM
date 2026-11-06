@@ -45,7 +45,7 @@ export default async function ProblemPage({ params }: { params: Promise<{ id: st
         <div className="min-w-0 space-y-6">
           {p.description && <Card className="p-5"><p className="whitespace-pre-wrap text-sm leading-relaxed">{p.description}</p></Card>}
           <RcaEditor id={p.id} disabled={closed} initial={{ rcaMethod: p.rcaMethod ?? "five_whys", rootCause: p.rootCause ?? "", workaround: p.workaround ?? "", permanentFix: p.permanentFix ?? "" }} />
-          <Tasks problemId={p.id} disabled={closed} staff={staff} tasks={p.tasks.map((t) => ({ id: t.id, title: t.title, owner: t.owner?.name ?? null, dueDate: t.dueDate, done: !!t.doneAt }))} />
+          <Tasks problemId={p.id} disabled={closed} today={new Date().toISOString().slice(0, 10)} staff={staff} tasks={p.tasks.map((t) => ({ id: t.id, title: t.title, owner: t.owner?.name ?? null, dueDate: t.dueDate, done: !!t.doneAt }))} />
           <Card>
             <CardHeader title={`Incidentes vinculados (${p.incidents.length})`} description={openIncidents ? `${openIncidents} siguen abiertos` : "Todos resueltos"} />
             {p.incidents.length > 0 && (

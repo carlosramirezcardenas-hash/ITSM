@@ -15,6 +15,10 @@ const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)]!;
 const chance = (p: number) => rand() < p;
 
 async function main() {
+  if (process.env.SEED_IF_EMPTY === "1" && (await db.organization.count()) > 0) {
+    console.log("✔ La base de datos ya tiene datos: se omite la carga de demostración.");
+    return;
+  }
   console.log("→ Limpiando base de datos…");
   await db.auditLog.deleteMany();
   await db.notification.deleteMany();

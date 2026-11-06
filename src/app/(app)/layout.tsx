@@ -3,9 +3,12 @@ import { db } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { ROLE_LABEL } from "@/lib/labels";
 import { AppShell, type NavSection } from "@/components/app-shell";
+import { after } from "next/server";
+import { maybeRunSlaSweep } from "@/server/sla";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  after(() => maybeRunSlaSweep().catch((e) => console.error("[sla-sweep]", e)));
   const sections: NavSection[] = [];
 
   if (user.role === "SUPER_ADMIN") {

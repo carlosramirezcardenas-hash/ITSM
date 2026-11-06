@@ -125,3 +125,22 @@ export async function runSlaSweep(now = new Date()) {
   }
   return stats;
 }
+
+/**
+ * Barrido «perezoso» para serverless (Vercel): se dispara con la actividad de los usuarios.
+ * Como máximo una vez por minuto en toda la plataforma: el UPDATE condicional en BD
+ * garantiza que solo una instancia lo ejecute aunque haya varias en paralelo.
+ */
+export async function maybeRunSlaSweep(minIntervalMs = 60_000) {
+  const g = globalThis as unknown as { __slaLastCheck?: number };
+  const now = Date.now();
+  if (now - (g.__slaLastCheck ?? 0) < 15_000) return null; // evita consultar la BD en cada request
+  g.__slaLastCheck = now;
+  await db.jobLock.upsert({ where: { name: "sla-sweep" }, create: { name: "sla-sweep", lastRunAt: new Date(0) }, update: {} });
+  const claimed = await db.jobLock.updateMany({
+    where: { name: "sla-sweep", lastRunAt: { lt: new Date(now - minIntervalMs) } },
+    data: { lastRunAt: new Date(now) },
+  });
+  if (claimed.count === 0) return null;
+  return runSlaSweep();
+}

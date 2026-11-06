@@ -1,6 +1,7 @@
 /** Planificador interno: barrido de SLA cada minuto (servidor Node de larga duración). */
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== "nodejs" || process.env.DISABLE_SLA_SCHEDULER === "true") return;
+  // En Vercel (serverless) no hay procesos de larga duración: se usa maybeRunSlaSweep() + cron diario.
+  if (process.env.NEXT_RUNTIME !== "nodejs" || process.env.VERCEL || process.env.DISABLE_SLA_SCHEDULER === "true") return;
   const g = globalThis as unknown as { __slaTimer?: NodeJS.Timeout };
   if (g.__slaTimer) return;
   const { runSlaSweep } = await import("./server/sla");
