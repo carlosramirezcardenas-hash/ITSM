@@ -23,6 +23,7 @@ export function toActionError(e: unknown): { ok: false; error: string; fields?: 
   if (e instanceof ZodError) {
     const fields: Record<string, string> = {};
     for (const issue of e.issues) fields[issue.path.join(".")] ??= issue.message;
+    console.warn("[validation]", e.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     return { ok: false, error: "Revisa los campos marcados.", fields };
   }
   if (e && typeof e === "object" && "digest" in e && String((e as { digest: string }).digest).startsWith("NEXT_REDIRECT")) throw e;

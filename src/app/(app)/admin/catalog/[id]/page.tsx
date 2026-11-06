@@ -19,7 +19,7 @@ export default async function EditService({ params }: { params: Promise<{ id: st
   ]);
   return <ServiceEditor categories={categories} teams={teams} users={users} service={s ? {
     id: s.id, name: s.name, description: s.description, icon: s.icon, categoryId: s.categoryId ?? "", estimatedHours: s.estimatedHours, requirements: s.requirements ?? "",
-    formSchema: s.formSchema as unknown as FormField[], requiresApproval: s.requiresApproval, approvalMode: s.approvalMode as "MANAGER" | "USER", approverId: s.approverId ?? "",
+    formSchema: s.formSchema as unknown as FormField[], requiresApproval: s.requiresApproval, approvalMode: s.approvalMode as "MANAGER" | "USER", approverId: s.approverId ?? "", secondApproverId: s.secondApproverId ?? "",
     ownerTeamId: s.ownerTeamId ?? "", ownerId: s.ownerId ?? "", defaultPriority: s.defaultPriority, isActive: s.isActive,
   } : null} />;
 }

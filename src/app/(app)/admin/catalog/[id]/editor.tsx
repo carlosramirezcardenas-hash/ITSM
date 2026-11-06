@@ -13,9 +13,9 @@ import { cn, slugify } from "@/lib/utils";
 
 type S = {
   id?: string; name: string; description: string; icon: string; categoryId: string; estimatedHours: number; requirements: string; formSchema: FormField[];
-  requiresApproval: boolean; approvalMode: "MANAGER" | "USER"; approverId: string; ownerTeamId: string; ownerId: string; defaultPriority: string; isActive: boolean;
+  requiresApproval: boolean; approvalMode: "MANAGER" | "USER"; approverId: string; secondApproverId: string; ownerTeamId: string; ownerId: string; defaultPriority: string; isActive: boolean;
 };
-const EMPTY: S = { name: "", description: "", icon: "package", categoryId: "", estimatedHours: 24, requirements: "", formSchema: [], requiresApproval: false, approvalMode: "MANAGER", approverId: "", ownerTeamId: "", ownerId: "", defaultPriority: "P3", isActive: true };
+const EMPTY: S = { name: "", description: "", icon: "package", categoryId: "", estimatedHours: 24, requirements: "", formSchema: [], requiresApproval: false, approvalMode: "MANAGER", approverId: "", secondApproverId: "", ownerTeamId: "", ownerId: "", defaultPriority: "P3", isActive: true };
 const TYPES: Record<FormField["type"], string> = { text: "Texto corto", textarea: "Texto largo", select: "Lista de opciones", date: "Fecha", number: "Número" };
 
 export function ServiceEditor({ service, categories, teams, users }: { service: S | null; categories: { id: string; name: string }[]; teams: { id: string; name: string }[]; users: { id: string; name: string; role: string }[] }) {
@@ -96,6 +96,9 @@ export function ServiceEditor({ service, categories, teams, users }: { service: 
                 <Field label="¿Quién aprueba?" htmlFor="am"><Select id="am" value={s.approvalMode} onChange={(e) => setS({ ...s, approvalMode: e.target.value as S["approvalMode"] })}><option value="MANAGER">Jefatura directa del solicitante</option><option value="USER">Una persona específica</option></Select></Field>
                 <Field label={s.approvalMode === "USER" ? "Aprobador" : "Aprobador de respaldo"} htmlFor="ap" hint={s.approvalMode === "MANAGER" ? "Se usa si el solicitante no tiene jefatura registrada." : undefined} error={errors.approverId}>
                   <Select id="ap" value={s.approverId} onChange={(e) => setS({ ...s, approverId: e.target.value })}><option value="">—</option>{users.filter((u) => u.role !== "END_USER").map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role]}</option>)}</Select>
+                </Field>
+                <Field label="Segundo nivel de aprobación (opcional)" htmlFor="ap2" hint="Se pide después de que apruebe el primer nivel. Ej: Finanzas para compras." className="sm:col-span-2">
+                  <Select id="ap2" value={s.secondApproverId} onChange={(e) => setS({ ...s, secondApproverId: e.target.value })}><option value="">Sin segundo nivel</option>{users.filter((u) => u.role !== "END_USER").map((u) => <option key={u.id} value={u.id}>{u.name} · {ROLE_LABEL[u.role]}</option>)}</Select>
                 </Field>
               </>
             )}

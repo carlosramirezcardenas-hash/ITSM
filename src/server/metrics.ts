@@ -144,3 +144,42 @@ export async function agentStats(ctx: Ctx) {
     csatCount: csat._count.csatScore,
   };
 }
+
+/** Fase 2: indicadores de cambios, problemas y CMDB para el período. */
+export async function getItsmMetrics(ctx: Ctx, raw: unknown) {
+  const f = metricsFilters.parse(raw ?? {});
+  const to = f.to ? new Date(`${f.to}T23:59:59.999Z`) : new Date();
+  const from = f.from ? new Date(`${f.from}T00:00:00Z`) : new Date(to.getTime() - 29 * 86400_000);
+  const teamScope = f.teamId ? { teamId: f.teamId } : {};
+  const [changes, problemsOpen, knownErrors, problemsResolved, linkedOpen, ciIncidents, mttrRows] = await Promise.all([
+    db.change.findMany({ where: { orgId: ctx.orgId, ...teamScope, OR: [{ actualEnd: { gte: from, lte: to } }, { plannedStart: { gte: from, lte: to } }] }, select: { type: true, status: true, outcome: true, risk: true, actualEnd: true } }),
+    db.problem.count({ where: { orgId: ctx.orgId, ...teamScope, status: { in: ["NEW", "INVESTIGATING", "KNOWN_ERROR"] } } }),
+    db.problem.count({ where: { orgId: ctx.orgId, ...teamScope, status: "KNOWN_ERROR" } }),
+    db.problem.count({ where: { orgId: ctx.orgId, ...teamScope, resolvedAt: { gte: from, lte: to } } }),
+    db.ticket.count({ where: { orgId: ctx.orgId, problemId: { not: null }, status: { in: ["NEW", "ASSIGNED", "IN_PROGRESS", "PENDING"] } } }),
+    db.ticket.groupBy({ by: ["configItemId"], where: { orgId: ctx.orgId, type: "INCIDENT", configItemId: { not: null }, createdAt: { gte: from, lte: to } }, _count: { _all: true }, orderBy: { _count: { configItemId: "desc" } }, take: 6 }),
+    db.ticket.findMany({ where: { orgId: ctx.orgId, ...teamScope, resolvedAt: { gte: from, lte: to } }, select: { priority: true, createdAt: true, resolvedAt: true, resolutionBreached: true } }),
+  ]);
+  const implemented = changes.filter((c) => c.outcome && c.actualEnd && c.actualEnd >= from && c.actualEnd <= to);
+  const ok = implemented.filter((c) => c.outcome === "SUCCESSFUL").length;
+  const ciNames = await db.configItem.findMany({ where: { id: { in: ciIncidents.map((c) => c.configItemId!) } }, select: { id: true, name: true } });
+  return {
+    changes: {
+      planned: changes.length,
+      implemented: implemented.length,
+      successful: ok,
+      failed: implemented.filter((c) => c.outcome === "FAILED" || c.outcome === "ROLLED_BACK").length,
+      partial: implemented.filter((c) => c.outcome === "PARTIAL").length,
+      successRate: pct(ok, implemented.length),
+      emergency: changes.filter((c) => c.type === "EMERGENCY").length,
+      byType: (["STANDARD", "NORMAL", "EMERGENCY"] as const).map((t) => ({ type: t, count: changes.filter((c) => c.type === t).length })),
+      highRisk: changes.filter((c) => c.risk === "HIGH").length,
+    },
+    problems: { open: problemsOpen, knownErrors, resolved: problemsResolved, linkedOpenIncidents: linkedOpen },
+    topCIs: ciIncidents.map((c) => ({ id: c.configItemId!, name: ciNames.find((n) => n.id === c.configItemId)?.name ?? "—", count: c._count._all })),
+    mttrByPriority: (["P1", "P2", "P3", "P4"] as const).map((p) => {
+      const rows = mttrRows.filter((r) => r.priority === p);
+      return { priority: p, count: rows.length, mttr: avg(rows.map((r) => (r.resolvedAt!.getTime() - r.createdAt.getTime()) / 60000)), sla: pct(rows.filter((r) => !r.resolutionBreached).length, rows.length) };
+    }),
+  };
+}

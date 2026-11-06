@@ -353,6 +353,113 @@ async function main() {
     ],
   });
 
+  // ============================================================ FASE 2: CMDB, problemas, cambios
+  console.log("→ CMDB, problemas y cambios…");
+  await db.serviceItem.update({ where: { id: sNotebook.id }, data: { secondApproverId: admin.id } }); // aprobación multinivel: jefatura → TI
+  const ci = async (name: string, type: any, criticality: any, extra: Record<string, unknown> = {}) =>
+    db.configItem.create({ data: { orgId: O, name, type, criticality, ...extra } });
+  const vSap = await ci("SAP SE", "VENDOR", "HIGH", { contact: "Soporte SAP · 800-123-456 · contrato Enterprise", expiresAt: "2027-06-30" });
+  const vMs = await ci("Microsoft", "VENDOR", "HIGH", { contact: "Soporte Microsoft 365 (portal de administración)", expiresAt: "2027-03-31" });
+  const vEntel = await ci("Entel Empresas", "VENDOR", "HIGH", { contact: "Mesa NOC 24x7 · 600-360-0000 · SLA 4 h", expiresAt: "2026-12-31" });
+  const vForti = await ci("Fortinet", "VENDOR", "MEDIUM", { contact: "Partner: SecureNet Chile", expiresAt: "2026-11-30" });
+  const net = await ci("Enlace Internet Santiago", "NETWORK", "HIGH", { location: "Data center Santiago", description: "Fibra 500 Mbps principal" });
+  const netAnt = await ci("Enlace Antofagasta", "NETWORK", "MEDIUM", { location: "Sucursal Antofagasta", description: "MPLS 100 Mbps" });
+  const fw = await ci("FW-CORE-01", "NETWORK", "HIGH", { ipAddress: "10.0.0.1", version: "FortiOS 7.2.8", serial: "FG100F-0042", location: "Data center Santiago", ownerId: javiera!.id, teamId: tInfra.id });
+  const sw2 = await ci("SW-PISO2", "NETWORK", "MEDIUM", { ipAddress: "10.0.2.2", location: "Piso 2 · Comercial", serial: "CSW-2290-118", ownerId: javiera!.id, teamId: tInfra.id });
+  const srvSap = await ci("SRV-SAP-PRD-01", "SERVER", "HIGH", { ipAddress: "10.0.10.21", version: "SUSE 15 SP5", location: "Data center Santiago", ownerId: tomas!.id, teamId: tApps.id });
+  const dbSap = await ci("DB-SAP-PRD", "DATABASE", "HIGH", { ipAddress: "10.0.10.22", version: "HANA 2.0 SPS07", ownerId: tomas!.id, teamId: tApps.id });
+  const srvWms = await ci("SRV-WMS-01", "SERVER", "HIGH", { ipAddress: "10.0.10.31", version: "Windows Server 2022", location: "Data center Santiago", ownerId: javiera!.id, teamId: tInfra.id });
+  const srvFile = await ci("SRV-FILE-01", "SERVER", "MEDIUM", { ipAddress: "10.0.10.40", version: "Windows Server 2019", ownerId: diego!.id, teamId: tInfra.id });
+  const aSap = await ci("SAP S/4HANA", "APPLICATION", "HIGH", { version: "2023 FPS01", ownerId: tomas!.id, teamId: tApps.id });
+  const aWms = await ci("WMS Bodega", "APPLICATION", "HIGH", { version: "8.4", ownerId: tomas!.id, teamId: tApps.id });
+  const aSf = await ci("Salesforce Sales Cloud", "APPLICATION", "MEDIUM", { ownerId: tomas!.id, teamId: tApps.id });
+  const aM365 = await ci("Microsoft 365", "APPLICATION", "HIGH", { description: "Correo, Teams, OneDrive y Office", ownerId: camila!.id, teamId: tHelp.id });
+  const aVpn = await ci("FortiClient VPN", "APPLICATION", "MEDIUM", { version: "7.2", ownerId: javiera!.id, teamId: tInfra.id });
+  await ci("Microsoft 365 E3", "LICENSE", "HIGH", { seats: 250, seatsUsed: 231, expiresAt: "2027-03-31", ownerId: admin.id });
+  await ci("Adobe Acrobat Pro", "LICENSE", "LOW", { seats: 30, seatsUsed: 29, expiresAt: "2026-12-15", ownerId: camila!.id });
+  await ci("AutoCAD LT", "LICENSE", "LOW", { seats: 5, seatsUsed: 5, expiresAt: "2026-11-20", ownerId: camila!.id });
+  await ci("NB-0231 Dell Latitude 5440", "HARDWARE", "LOW", { serial: "DL5440-77812", location: "Piso 3 · Finanzas", description: "Asignado a Ana Torres", expiresAt: "2027-08-01" });
+  const prn = await ci("HP LaserJet M507 · Finanzas", "HARDWARE", "LOW", { serial: "HPM507-1192", location: "Piso 3 · Finanzas", ipAddress: "10.0.3.50" });
+  const svFac = await ci("Facturación y contabilidad", "SERVICE", "HIGH", { description: "Emisión de facturas, contabilidad y cierre mensual", ownerId: approver.id, teamId: tApps.id });
+  const svDes = await ci("Despachos y bodega", "SERVICE", "HIGH", { description: "Recepción, picking y despacho de mercadería", ownerId: opsBoss.id, teamId: tApps.id });
+  const svMail = await ci("Correo y colaboración", "SERVICE", "MEDIUM", { ownerId: camila!.id, teamId: tHelp.id });
+  const svCrm = await ci("Ventas y CRM", "SERVICE", "MEDIUM", { teamId: tApps.id });
+  const svVpn = await ci("Acceso remoto (VPN)", "SERVICE", "MEDIUM", { teamId: tInfra.id });
+  const rel = (a: { id: string }, b: { id: string }, type = "DEPENDS_ON") => db.ciRelation.create({ data: { sourceId: a.id, targetId: b.id, type } });
+  for (const [a, b, t] of [
+    [aSap, srvSap, "RUNS_ON"], [aSap, dbSap, "USES"], [dbSap, srvSap, "RUNS_ON"], [aSap, vSap, "SUPPLIED_BY"],
+    [aWms, srvWms, "RUNS_ON"], [aSf, net, "DEPENDS_ON"], [aM365, net, "DEPENDS_ON"], [aM365, vMs, "SUPPLIED_BY"],
+    [aVpn, fw, "DEPENDS_ON"], [fw, net, "CONNECTS_TO"], [fw, vForti, "SUPPLIED_BY"], [net, vEntel, "SUPPLIED_BY"],
+    [svFac, aSap, "DEPENDS_ON"], [svDes, aWms, "DEPENDS_ON"], [svDes, netAnt, "DEPENDS_ON"], [svMail, aM365, "DEPENDS_ON"],
+    [svCrm, aSf, "DEPENDS_ON"], [svVpn, aVpn, "DEPENDS_ON"], [svCrm, sw2, "DEPENDS_ON"],
+  ] as const) await rel(a, b, t);
+
+  // Asociar incidentes existentes a su elemento afectado
+  const ciRules: [RegExp, string][] = [[/WMS/i, aWms.id], [/Outlook|correo|Teams|Excel/i, aM365.id], [/VPN/i, aVpn.id], [/SAP|facturaci/i, aSap.id], [/Salesforce/i, aSf.id], [/segundo piso|Wi-Fi/i, sw2.id], [/Antofagasta/i, netAnt.id], [/impresora de Finanzas/i, prn.id]];
+  const incs = await db.ticket.findMany({ where: { orgId: O, type: "INCIDENT" }, select: { id: true, title: true, createdAt: true, status: true } });
+  for (const t of incs) { const r = ciRules.find(([re]) => re.test(t.title)); if (r) await db.ticket.update({ where: { id: t.id }, data: { configItemId: r[1] } }); }
+
+  let prbSeq = 100;
+  const wl = (entityType: string, entityId: string, actorId: string | null, action: string, note: string | null, createdAt: Date) => db.workLog.create({ data: { orgId: O, entityType, entityId, actorId, action, note, createdAt } });
+  const mkProblem = async (d: { title: string; description: string; status: any; impact: Level; urgency: Level; categoryId: string; teamId: string; ownerId: string; rootCause?: string; workaround?: string; permanentFix?: string; daysAgo: number; match: RegExp; cis: string[]; tasks?: [string, string, boolean][] }) => {
+    const createdAt = new Date(now - d.daysAgo * 86400_000);
+    const p = await db.problem.create({ data: {
+      orgId: O, number: ++prbSeq, title: d.title, description: d.description, status: d.status, impact: d.impact, urgency: d.urgency, priority: priorityMatrix(d.impact, d.urgency),
+      categoryId: d.categoryId, teamId: d.teamId, ownerId: d.ownerId, createdById: manager.id, rcaMethod: d.rootCause ? "five_whys" : null, rootCause: d.rootCause, workaround: d.workaround, permanentFix: d.permanentFix,
+      knownErrorAt: ["KNOWN_ERROR", "RESOLVED"].includes(d.status) && d.workaround ? new Date(createdAt.getTime() + 2 * 86400_000) : null,
+      resolvedAt: d.status === "RESOLVED" ? new Date(createdAt.getTime() + 5 * 86400_000) : null, createdAt, configItems: { connect: d.cis.map((id) => ({ id })) },
+    } });
+    const linked = incs.filter((t) => d.match.test(t.title)).map((t) => t.id);
+    await db.ticket.updateMany({ where: { id: { in: linked } }, data: { problemId: p.id } });
+    await wl("problem", p.id, manager.id, "created", `Con ${linked.length} incidente(s) vinculados`, createdAt);
+    if (d.rootCause) await wl("problem", p.id, d.ownerId, "field:rootCause", null, new Date(createdAt.getTime() + 86400_000));
+    if (d.status !== "NEW") await wl("problem", p.id, d.ownerId, `status:${d.status}`, null, new Date(createdAt.getTime() + 2 * 86400_000));
+    for (const [title, owner, done] of d.tasks ?? []) await db.problemTask.create({ data: { problemId: p.id, title, ownerId: owner, dueDate: new Date(now + (done ? -3 : 7) * 86400_000).toISOString().slice(0, 10), doneAt: done ? new Date(now - 2 * 86400_000) : null } });
+    return p;
+  };
+  await mkProblem({ title: "Outlook se cuelga al abrir perfiles de correo grandes", description: "Varios usuarios reportan que Outlook queda en «Cargando perfil». Todos tienen buzones sobre 45 GB.", status: "KNOWN_ERROR", impact: "MEDIUM", urgency: "MEDIUM", categoryId: cMail.id, teamId: tHelp.id, ownerId: camila!.id, daysAgo: 18, match: /Outlook/i, cis: [aM365.id],
+    rootCause: "1) Outlook se cuelga al iniciar → 2) el archivo OST supera 50 GB → 3) el modo caché descarga todo el buzón → 4) no existe política de archivado → 5) los buzones crecen sin límite desde la migración de 2023.",
+    workaround: "1. Cierra Outlook.\n2. Abre Panel de control > Correo > Cuentas de correo > Cambiar.\n3. Reduce «Correo sin conexión» a 6 meses.\n4. Vuelve a abrir Outlook y espera la sincronización.",
+    tasks: [["Definir política de archivado de 2 años", camila!.id, true], ["Aplicar archivado en línea a buzones > 40 GB", diego!.id, false], ["Comunicar la política a todas las áreas", manager.id, false]] });
+  await mkProblem({ title: "Lentitud recurrente de internet en el piso 2", description: "El equipo comercial reporta lentitud entre 10:00 y 12:00 casi a diario.", status: "INVESTIGATING", impact: "MEDIUM", urgency: "MEDIUM", categoryId: cNet.id, teamId: tInfra.id, ownerId: javiera!.id, daysAgo: 9, match: /segundo piso|Salesforce muy lento/i, cis: [sw2.id],
+    tasks: [["Monitorear uso de ancho de banda del switch por 1 semana", javiera!.id, false]] });
+  const prbWms = await mkProblem({ title: "Caídas del WMS por agotamiento de conexiones a la base de datos", description: "El WMS deja de responder en horas peak de despacho.", status: "RESOLVED", impact: "HIGH", urgency: "HIGH", categoryId: cApps.id, teamId: tApps.id, ownerId: tomas!.id, daysAgo: 40, match: /WMS/i, cis: [aWms.id, srvWms.id],
+    rootCause: "El pool de conexiones del WMS estaba limitado a 50; en peak se superan 80 sesiones simultáneas y las nuevas quedan en espera indefinida.",
+    workaround: "Reiniciar el servicio «WMS App Pool» en SRV-WMS-01 (libera conexiones colgadas).",
+    permanentFix: "Se aumentó el pool a 200 conexiones y se configuró timeout de 30 s (CHG-101).", tasks: [["Ajustar pool de conexiones", tomas!.id, true], ["Agregar alerta de conexiones > 150", javiera!.id, true]] });
+  await mkProblem({ title: "El escáner del primer piso no envía documentos al correo", description: "Falla intermitente del envío SMTP desde el escáner.", status: "NEW", impact: "LOW", urgency: "LOW", categoryId: cPrint.id, teamId: tHelp.id, ownerId: diego!.id, daysAgo: 3, match: /Escáner/i, cis: [] });
+  await db.organization.update({ where: { id: O }, data: { problemSeq: prbSeq } });
+
+  let chgSeq = 100;
+  const at = (days: number, hour: number) => { const d = new Date(now + days * 86400_000); d.setUTCHours(hour + 3, 0, 0, 0); return d; }; // hora local Chile (UTC-3)
+  const mkChange = async (d: { title: string; description: string; type: any; status: any; risk: Level; impact: Level; riskScore: number; start: Date; end: Date; cis: string[]; ownerId: string; teamId: string; outcome?: any; review?: string; problemId?: string; approvals?: [string, number, any][]; riskAnswers?: Record<string, boolean> }) => {
+    const createdAt = new Date(Math.min(d.start.getTime() - 5 * 86400_000, now - 86400_000));
+    const c = await db.change.create({ data: {
+      orgId: O, number: ++chgSeq, title: d.title, description: d.description, type: d.type, status: d.status, risk: d.risk, impact: d.impact, riskScore: d.riskScore, riskAnswers: d.riskAnswers ?? {},
+      reason: "Mantener la continuidad operacional y la seguridad de la plataforma.",
+      implementationPlan: "1. Respaldo completo y snapshot.\n2. Aviso a usuarios clave 24 h antes.\n3. Aplicar el cambio según procedimiento del proveedor.\n4. Pruebas de humo con usuarios clave.",
+      rollbackPlan: "Restaurar el snapshot previo (tiempo estimado 30 min) y validar servicios.", testPlan: "Verificar acceso, transacciones de prueba y monitoreo por 2 h.",
+      plannedStart: d.start, plannedEnd: d.end, actualStart: d.outcome ? d.start : null, actualEnd: d.outcome ? d.end : null, outcome: d.outcome, reviewNotes: d.review,
+      requesterId: d.ownerId, ownerId: d.ownerId, teamId: d.teamId, problemId: d.problemId, createdAt, configItems: { connect: d.cis.map((id) => ({ id })) },
+    } });
+    for (const [approverId, level, status] of d.approvals ?? []) await db.changeApproval.create({ data: { changeId: c.id, approverId, level, status, decidedAt: status === "PENDING" ? null : new Date(createdAt.getTime() + 86400_000), createdAt } });
+    await wl("change", c.id, d.ownerId, "created", null, createdAt);
+    if (d.status !== "DRAFT") await wl("change", c.id, d.ownerId, `status:${d.type === "STANDARD" ? "SCHEDULED" : "PENDING_APPROVAL"}`, d.type === "STANDARD" ? "Cambio estándar preaprobado" : "Enviado al CAB", new Date(createdAt.getTime() + 3600_000));
+    if (d.outcome) await wl("change", c.id, d.ownerId, "status:REVIEW", d.outcome === "SUCCESSFUL" ? "Exitoso" : "Revertido — la migración superó la ventana; se ejecutó el plan de reversa.", d.end);
+    if (d.review) await wl("change", c.id, manager.id, "status:CLOSED", d.review, new Date(d.end.getTime() + 86400_000));
+    return c;
+  };
+  const okApproval: [string, number, any][] = [[manager.id, 1, "APPROVED"]];
+  await mkChange({ title: "Aumentar el pool de conexiones del WMS", description: "Ajuste de configuración del pool de conexiones de 50 a 200 y timeout de 30 s.", type: "NORMAL", status: "CLOSED", risk: "MEDIUM", impact: "HIGH", riskScore: 5, start: at(-33, 22), end: at(-33, 23), cis: [aWms.id, srvWms.id], ownerId: tomas!.id, teamId: tApps.id, outcome: "SUCCESSFUL", review: "Sin caídas del WMS en 30 días. Problema PRB-103 resuelto.", problemId: prbWms.id, approvals: okApproval });
+  await mkChange({ title: "Migración de buzones al nuevo plan de archivado", description: "Mover buzones > 40 GB a archivado en línea.", type: "NORMAL", status: "CLOSED", risk: "MEDIUM", impact: "MEDIUM", riskScore: 5, start: at(-20, 20), end: at(-20, 23), cis: [aM365.id], ownerId: diego!.id, teamId: tHelp.id, outcome: "ROLLED_BACK", review: "Se reprogramará por lotes de 20 buzones. Lección: estimar tiempos con una prueba piloto.", approvals: okApproval });
+  await mkChange({ title: "Instalar switch adicional en bodega", description: "Nuevo switch de acceso para lectores de código de barras.", type: "STANDARD", status: "CLOSED", risk: "LOW", impact: "LOW", riskScore: 1, start: at(-25, 19), end: at(-25, 20), cis: [netAnt.id], ownerId: javiera!.id, teamId: tInfra.id, outcome: "SUCCESSFUL", review: "Lectores operativos." });
+  await mkChange({ title: "Reinicio de emergencia del servidor WMS", description: "Reinicio controlado para restaurar el servicio de despachos (incidente P1).", type: "EMERGENCY", status: "REVIEW", risk: "HIGH", impact: "HIGH", riskScore: 9, start: new Date(now - 2 * 3600_000), end: new Date(now - 1.5 * 3600_000), cis: [srvWms.id], ownerId: javiera!.id, teamId: tInfra.id, outcome: "SUCCESSFUL", approvals: [[manager.id, 1, "APPROVED"]] });
+  await mkChange({ title: "Parches de seguridad mensuales de Windows Server", description: "Actualizaciones acumulativas de noviembre en servidores Windows.", type: "STANDARD", status: "SCHEDULED", risk: "LOW", impact: "MEDIUM", riskScore: 2, start: at(2, 22), end: at(3, 2), cis: [srvFile.id, srvWms.id], ownerId: diego!.id, teamId: tInfra.id });
+  await mkChange({ title: "Actualizar firmware del firewall FW-CORE-01", description: "Actualización a FortiOS 7.4.4 por vulnerabilidad crítica publicada por el fabricante.", type: "NORMAL", status: "PENDING_APPROVAL", risk: "HIGH", impact: "MEDIUM", riskScore: 9, start: at(5, 23), end: at(6, 1), cis: [fw.id], ownerId: javiera!.id, teamId: tInfra.id, riskAnswers: { production: true, downtime: true, untested: true }, approvals: [[manager.id, 1, "PENDING"]] });
+  await mkChange({ title: "Migrar enlace de Internet a fibra de 1 Gbps", description: "Cambio de última milla con Entel. Requiere corte de 30 min.", type: "NORMAL", status: "SCHEDULED", risk: "MEDIUM", impact: "MEDIUM", riskScore: 5, start: at(5, 22), end: at(6, 0), cis: [net.id, fw.id], ownerId: javiera!.id, teamId: tInfra.id, approvals: okApproval });
+  await mkChange({ title: "Actualizar SAP S/4HANA a FPS02", description: "Actualización de feature pack con nuevas validaciones tributarias.", type: "NORMAL", status: "DRAFT", risk: "HIGH", impact: "HIGH", riskScore: 10, start: at(24, 20), end: at(25, 6), cis: [aSap.id, dbSap.id], ownerId: tomas!.id, teamId: tApps.id, riskAnswers: { production: true, downtime: true, noRollback: true } });
+  await db.organization.update({ where: { id: O }, data: { changeSeq: chgSeq } });
+
   // ------------------------------------------------------------ Segunda organización (demuestra aislamiento multi-tenant)
   const org2 = await db.organization.create({ data: { name: "Globex Retail", slug: "globex", plan: "starter" } });
   const g = await db.user.create({ data: { orgId: org2.id, email: "admin@globex.demo", name: "Hernán Ibáñez", role: "ORG_ADMIN", passwordHash: hash } });
@@ -364,7 +471,7 @@ async function main() {
   await db.organization.update({ where: { id: org2.id }, data: { ticketSeq: 1 } });
 
   const count = await db.ticket.count({ where: { orgId: O } });
-  console.log(`✔ Listo: ${count} tickets en «${org.name}», ${services.length} servicios, 10 artículos.`);
+  console.log(`✔ Listo: ${count} tickets en «${org.name}», ${services.length} servicios, 10 artículos, ${await db.configItem.count({ where: { orgId: O } })} elementos CMDB, ${prbSeq - 100} problemas, ${chgSeq - 100} cambios.`);
   console.log(`  Contraseña de todos los usuarios demo: ${PASSWORD}`);
 }
 
