@@ -183,7 +183,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
         <aside className="space-y-4">
           {staff ? (
             <StaffPanel
-              key={t.updatedAt.toISOString()}
+              key={[t.status, t.assigneeId, t.teamId, t.impact, t.urgency, t.categoryId, t.approvalStatus].join("|")}
               ticket={{ id: t.id, status: t.status, assigneeId: t.assigneeId, teamId: t.teamId, impact: t.impact, urgency: t.urgency, priority: t.priority, categoryId: t.categoryId, approvalPending: t.approvalStatus === "PENDING", resolution: t.resolution }}
               next={allowedNext(t.status)} teams={teams} categories={categories}
               agents={agents.map((a) => ({ id: a.id, name: a.name, teamIds: a.memberships.map((m) => m.teamId) }))} me={ctx.user.id}

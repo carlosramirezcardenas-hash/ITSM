@@ -209,8 +209,11 @@ async function main() {
     await adm.goto("/admin/users");
     await adm.getByRole("button", { name: "Nuevo usuario" }).click();
     const email = `nuevo${Date.now()}@andes.demo`;
-    await adm.getByLabel("Nombre").fill("Usuario de Prueba");
-    await adm.getByLabel("Correo").fill(email);
+    await adm.getByLabel("Nombre").click();
+    await adm.keyboard.type("Usuario de Prueba", { delay: 10 });
+    await adm.getByLabel("Correo").click();
+    await adm.keyboard.type(email, { delay: 10 });
+    assert.equal(await adm.getByLabel("Nombre").inputValue(), "Usuario de Prueba");
     await adm.getByLabel("Contraseña inicial").fill("corta");
     await adm.getByRole("button", { name: "Guardar" }).click();
     await adm.getByText(/al menos 10 caracteres/).first().waitFor();
@@ -234,6 +237,28 @@ async function main() {
     await shot(root, "15-plataforma");
     const r = await root.request.get("/api/v1/tickets");
     assert.equal(r.status(), 403);
+  });
+  await step("Ventanas emergentes: se puede escribir tecla por tecla en todos los campos (crear organización)", async () => {
+    const slug = `jp-${Date.now().toString(36)}`;
+    await root.getByRole("button", { name: "Nueva organización" }).click();
+    // Escritura real: click en cada campo y teclado (fill() no detecta robos de foco)
+    const type = async (label: string, text: string) => { await root.getByLabel(label).click(); await root.keyboard.type(text, { delay: 15 }); };
+    await type("Nombre de la empresa", "JP Inversiones");
+    await root.getByLabel("Identificador").click();
+    await root.keyboard.press("Control+A");
+    await root.keyboard.type(slug, { delay: 15 });
+    await type("Nombre del administrador", "Carlos Ramírez");
+    await type("Correo del administrador", `admin@${slug}.demo`);
+    await type("Contraseña inicial", "Inversiones2026");
+    assert.equal(await root.getByLabel("Nombre de la empresa").inputValue(), "JP Inversiones");
+    assert.equal(await root.getByLabel("Nombre del administrador").inputValue(), "Carlos Ramírez");
+    assert.equal(await root.getByLabel("Correo del administrador").inputValue(), `admin@${slug}.demo`);
+    await root.getByRole("button", { name: "Crear" }).click();
+    await root.getByText("JP Inversiones").first().waitFor();
+    // Escape sigue cerrando la ventana
+    await root.getByRole("button", { name: "Nueva organización" }).click();
+    await root.keyboard.press("Escape");
+    assert.equal(await root.getByRole("dialog").count(), 0);
   });
 
   console.log("Responsive y modo oscuro");
