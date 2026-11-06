@@ -66,6 +66,8 @@ model Organization {
   plan       String   @default("starter")
   timezone   String   @default("America/Santiago")
   ticketSeq  Int      @default(1000)
+  problemSeq Int      @default(100)
+  changeSeq  Int      @default(100)
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -81,6 +83,10 @@ model Organization {
   articles      KbArticle[]
   notifications Notification[]
   auditLogs     AuditLog[]
+  problems      Problem[]
+  changes       Change[]
+  configItems   ConfigItem[]
+  workLogs      WorkLog[]
 }
 
 model User {
@@ -117,6 +123,15 @@ model User {
   approverServices ServiceItem[] @relation("ServiceApprover")
   articles         KbArticle[]
   articleFeedback  KbFeedback[]
+  problemsOwned    Problem[]  @relation("ProblemOwner")
+  problemsCreated  Problem[]  @relation("ProblemCreator")
+  problemTasks     ProblemTask[]
+  changesRequested Change[]   @relation("ChangeRequester")
+  changesOwned     Change[]   @relation("ChangeOwner")
+  changeApprovals  ChangeApproval[]
+  ciOwned          ConfigItem[]
+  workLogs         WorkLog[]
+  secondApproverServices ServiceItem[] @relation("ServiceSecondApprover")
 
   @@index([orgId, role])
 }
@@ -168,6 +183,9 @@ model Team {
   tickets    Ticket[]
   categories Category[]
   services   ServiceItem[]
+  problems   Problem[]
+  changes    Change[]
+  configItems ConfigItem[]
 
   @@unique([orgId, name])
 }
@@ -197,6 +215,7 @@ model Category {
   services ServiceItem[]
   tickets  Ticket[]
   articles KbArticle[]
+  problems Problem[]
 
   @@unique([orgId, name])
 }
@@ -220,6 +239,9 @@ model ServiceItem {
   approvalMode     String   @default("MANAGER")
   approverId       String?
   approver         User?    @relation("ServiceApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  // Aprobación multinivel: segundo nivel opcional (p. ej. TI o Finanzas)
+  secondApproverId String?
+  secondApprover   User?    @relation("ServiceSecondApprover", fields: [secondApproverId], references: [id], onDelete: SetNull)
   ownerTeamId      String?
   ownerTeam        Team?    @relation(fields: [ownerTeamId], references: [id], onDelete: SetNull)
   ownerId          String?
@@ -321,9 +343,14 @@ model Ticket {
   reopenCount     Int            @default(0)
   csatScore       Int?
   csatComment     String?
+  problemId       String?
+  problem         Problem?       @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  configItemId    String?
+  configItem      ConfigItem?    @relation(fields: [configItemId], references: [id], onDelete: SetNull)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
+  linkedArticles KbArticle[]   @relation("TicketArticles")
   comments   TicketComment[]
   activities TicketActivity[]
   approvals  Approval[]
@@ -333,6 +360,7 @@ model Ticket {
   @@index([orgId, assigneeId])
   @@index([orgId, requesterId])
   @@index([orgId, createdAt])
+  @@index([problemId])
 }
 
 model TicketComment {
@@ -369,6 +397,7 @@ model Approval {
   ticket     Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   approverId String
   approver   User           @relation(fields: [approverId], references: [id], onDelete: Cascade)
+  level      Int            @default(1)
   status     ApprovalStatus @default(PENDING)
   comment    String?
   decidedAt  DateTime?
@@ -399,6 +428,8 @@ model KbArticle {
   updatedAt  DateTime      @updatedAt
 
   feedback KbFeedback[]
+  tickets  Ticket[]  @relation("TicketArticles")
+  problems Problem[] @relation("ProblemArticles")
 
   @@unique([orgId, slug])
 }
@@ -444,4 +475,228 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([orgId, createdAt])
+}
+
+// =====================================================================
+// FASE 2 — Problemas, Cambios, CMDB
+// =====================================================================
+
+enum ProblemStatus {
+  NEW
+  INVESTIGATING  // Análisis de causa raíz
+  KNOWN_ERROR    // Causa identificada, solución temporal disponible
+  RESOLVED       // Solución definitiva aplicada
+  CLOSED
+}
+
+model Problem {
+  id             String        @id @default(cuid())
+  orgId          String
+  org            Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  number         Int
+  title          String
+  description    String
+  status         ProblemStatus @default(NEW)
+  priority       Priority      @default(P3)
+  impact         Level         @default(MEDIUM)
+  urgency        Level         @default(MEDIUM)
+  categoryId     String?
+  category       Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  teamId         String?
+  team           Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  ownerId        String?
+  owner          User?         @relation("ProblemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById    String
+  createdBy      User          @relation("ProblemCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  rcaMethod      String?       // five_whys | ishikawa | timeline | other
+  rootCause      String?
+  workaround     String?
+  permanentFix   String?
+  knownErrorAt   DateTime?
+  resolvedAt     DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  incidents   Ticket[]
+  tasks       ProblemTask[]
+  changes     Change[]
+  configItems ConfigItem[] @relation("ProblemCIs")
+  articles    KbArticle[]  @relation("ProblemArticles")
+
+  @@unique([orgId, number])
+  @@index([orgId, status])
+}
+
+model ProblemTask {
+  id        String    @id @default(cuid())
+  problemId String
+  problem   Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  title     String
+  ownerId   String?
+  owner     User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  dueDate   String?   // YYYY-MM-DD
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+enum ChangeType {
+  STANDARD   // preaprobado, bajo riesgo, repetible
+  NORMAL     // requiere evaluación y aprobación (CAB)
+  EMERGENCY  // aprobación acelerada (ECAB)
+}
+
+enum ChangeStatus {
+  DRAFT
+  ASSESSMENT        // evaluación de riesgo e impacto
+  PENDING_APPROVAL  // CAB
+  SCHEDULED         // aprobado y programado
+  IN_PROGRESS       // en implementación
+  REVIEW            // validación posterior a la implementación
+  CLOSED
+  REJECTED
+  CANCELLED
+}
+
+enum ChangeOutcome {
+  SUCCESSFUL
+  PARTIAL
+  FAILED
+  ROLLED_BACK
+}
+
+model Change {
+  id                 String         @id @default(cuid())
+  orgId              String
+  org                Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  number             Int
+  title              String
+  description        String
+  reason             String?        // justificación de negocio
+  type               ChangeType     @default(NORMAL)
+  status             ChangeStatus   @default(DRAFT)
+  risk               Level          @default(MEDIUM)
+  riskScore          Int            @default(0)
+  riskAnswers        Json?
+  impact             Level          @default(MEDIUM)
+  implementationPlan String?
+  rollbackPlan       String?
+  testPlan           String?
+  plannedStart       DateTime?
+  plannedEnd         DateTime?
+  actualStart        DateTime?
+  actualEnd          DateTime?
+  outcome            ChangeOutcome?
+  reviewNotes        String?
+  requesterId        String
+  requester          User           @relation("ChangeRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  ownerId            String?
+  owner              User?          @relation("ChangeOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  teamId             String?
+  team               Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  problemId          String?
+  problem            Problem?       @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  approvals   ChangeApproval[]
+  configItems ConfigItem[] @relation("ChangeCIs")
+
+  @@unique([orgId, number])
+  @@index([orgId, status])
+  @@index([orgId, plannedStart])
+}
+
+model ChangeApproval {
+  id         String         @id @default(cuid())
+  changeId   String
+  change     Change         @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  approverId String
+  approver   User           @relation(fields: [approverId], references: [id], onDelete: Cascade)
+  level      Int            @default(1)  // 1 = CAB, 2 = Dirección (riesgo alto)
+  status     ApprovalStatus @default(PENDING)
+  comment    String?
+  decidedAt  DateTime?
+  createdAt  DateTime       @default(now())
+
+  @@index([approverId, status])
+}
+
+enum CiType {
+  HARDWARE     // equipos
+  SERVER
+  APPLICATION
+  LICENSE
+  SERVICE      // servicio tecnológico
+  VENDOR       // proveedor
+  NETWORK
+  DATABASE
+}
+
+enum CiStatus {
+  ACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+model ConfigItem {
+  id          String    @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  type        CiType
+  status      CiStatus  @default(ACTIVE)
+  criticality Level     @default(MEDIUM)
+  description String?
+  ownerId     String?
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  teamId      String?
+  team        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  serial      String?
+  location    String?
+  ipAddress   String?
+  version     String?
+  seats       Int?      // licencias
+  seatsUsed   Int?
+  expiresAt   String?   // YYYY-MM-DD (licencias, garantías, contratos)
+  contact     String?   // proveedores
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  outgoing  CiRelation[] @relation("RelSource")
+  incoming  CiRelation[] @relation("RelTarget")
+  tickets   Ticket[]
+  problems  Problem[]    @relation("ProblemCIs")
+  changes   Change[]     @relation("ChangeCIs")
+
+  @@unique([orgId, name])
+  @@index([orgId, type])
+}
+
+// source DEPENDE DE target (si target falla, source se ve afectado)
+model CiRelation {
+  id       String     @id @default(cuid())
+  sourceId String
+  source   ConfigItem @relation("RelSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId String
+  target   ConfigItem @relation("RelTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  type     String     @default("DEPENDS_ON") // DEPENDS_ON | RUNS_ON | USES | SUPPLIED_BY | CONNECTS_TO
+
+  @@unique([sourceId, targetId, type])
+}
+
+// Bitácora genérica para problemas y cambios (actividad + notas de trabajo)
+model WorkLog {
+  id         String   @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  entityType String   // problem | change
+  entityId   String
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
 }

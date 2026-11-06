@@ -96,3 +96,46 @@ test("Cifrado AES-256-GCM de campos sensibles", () => {
   const tampered = c.slice(0, -4) + (c.endsWith("A") ? "BBBB" : "AAAA");
   assert.throws(() => decrypt(tampered));
 });
+
+// ===================== Fase 2 =====================
+import { approvalLevels, assessRisk, CHANGE_FLOW, dependenciesOf, findConflicts, impactedBy, impactFromServices } from "../src/lib/itsm";
+
+test("Riesgo de cambio: cuestionario + servicios críticos", () => {
+  assert.equal(assessRisk({}).risk, "LOW");
+  assert.equal(assessRisk({ downtime: true, businessHours: true }).risk, "MEDIUM");
+  assert.equal(assessRisk({ production: true, untested: true, noRollback: true }).risk, "HIGH");
+  assert.equal(assessRisk({ downtime: true }, 1).risk, "MEDIUM");
+  assert.equal(assessRisk({ downtime: true, vendor: true }, 2).risk, "HIGH");
+});
+
+test("Niveles de aprobación CAB", () => {
+  assert.equal(approvalLevels("STANDARD", "HIGH"), 0);
+  assert.equal(approvalLevels("EMERGENCY", "HIGH"), 1);
+  assert.equal(approvalLevels("NORMAL", "MEDIUM"), 1);
+  assert.equal(approvalLevels("NORMAL", "HIGH"), 2);
+  assert.ok(!CHANGE_FLOW.DRAFT!.includes("IN_PROGRESS"), "no se implementa sin pasar por evaluación");
+});
+
+test("CMDB: impacto transitivo y tolerancia a ciclos", () => {
+  // app RUNS_ON srv; servicio DEPENDS_ON app; srv DEPENDS_ON san; ciclo san→servicio
+  const edges = [
+    { sourceId: "app", targetId: "srv" },
+    { sourceId: "svc", targetId: "app" },
+    { sourceId: "srv", targetId: "san" },
+    { sourceId: "san", targetId: "svc" },
+  ];
+  const hit = impactedBy("srv", edges);
+  assert.deepEqual(hit.map((h) => h.id).sort(), ["app", "san", "svc"]);
+  assert.equal(hit.find((h) => h.id === "svc")!.depth, 2);
+  assert.deepEqual(dependenciesOf("app", edges).map((d) => d.id).sort(), ["san", "srv", "svc"]);
+  assert.equal(impactFromServices([{ criticality: "LOW" }]), "LOW");
+  assert.equal(impactFromServices([{ criticality: "HIGH" }]), "HIGH");
+});
+
+test("Calendario: conflicto solo si se superponen y comparten CI", () => {
+  const d = (h: number) => new Date(Date.UTC(2026, 10, 10, h));
+  const a = { id: "a", start: d(1), end: d(3), ciIds: ["db"] };
+  assert.equal(findConflicts(a, [{ id: "b", start: d(2), end: d(4), ciIds: ["db", "x"] }]).length, 1);
+  assert.equal(findConflicts(a, [{ id: "c", start: d(2), end: d(4), ciIds: ["x"] }]).length, 0);
+  assert.equal(findConflicts(a, [{ id: "e", start: d(3), end: d(5), ciIds: ["db"] }]).length, 0, "ventanas contiguas no chocan");
+});
