@@ -6,7 +6,8 @@ import { type ActionResult, toActionError } from "@/server/errors";
 import * as AI from "@/server/ai-features";
 import * as AU from "@/server/automation";
 import * as IN from "@/server/integrations";
-import { assistantTurn } from "@/server/assistant";
+import { assistantFeedback, assistantOutcome, assistantTurn } from "@/server/assistant";
+import * as LA from "@/server/learning-admin";
 import { getMetrics, getItsmMetrics } from "@/server/metrics";
 import { updateTicket } from "@/server/tickets";
 import { db } from "@/lib/db";
@@ -108,4 +109,27 @@ export async function assistantAction(messages: { role: "user" | "assistant"; co
   return run(async () => {
     return assistantTurn(await getCtx("tickets:create"), { messages });
   });
+}
+export async function assistantFeedbackAction(interactionId: string, value: 1 | -1) {
+  return run(async () => assistantFeedback(await getCtx("tickets:create"), { interactionId, value }));
+}
+export async function assistantOutcomeAction(input: { interactionId: string } & ({ kind: "service"; targetId: string } | { kind: "resolved"; targetType: "ARTICLE" | "SOLUTION"; targetId: string } | { kind: "ticket"; ticketId: string } | { kind: "unhelpful"; targetType: "ARTICLE" | "SOLUTION"; targetId: string })) {
+  return run(async () => assistantOutcome(await getCtx("tickets:create"), input));
+}
+
+// ------------------------------------------------ Administración del aprendizaje
+export async function learningSyncAction() {
+  return run(async () => LA.runLearningSync(await getCtx("catalog:manage")), "Listo: el asistente revisó el historial de casos resueltos.", ["/admin/assistant"]);
+}
+export async function solutionStatusAction(id: string, status: "ACTIVE" | "HIDDEN") {
+  return run(async () => LA.setSolutionStatus(await getCtx("catalog:manage"), id, status), status === "HIDDEN" ? "Solución ocultada." : "Solución visible para el asistente.", ["/admin/assistant"]);
+}
+export async function solutionEditAction(id: string, input: unknown) {
+  return run(async () => LA.editSolution(await getCtx("catalog:manage"), id, input), "Solución actualizada.", ["/admin/assistant"]);
+}
+export async function termDisabledAction(id: string, disabled: boolean) {
+  return run(async () => LA.setTermDisabled(await getCtx("catalog:manage"), id, disabled), disabled ? "Palabra desactivada." : "Palabra activada.", ["/admin/assistant"]);
+}
+export async function termDeleteAction(id: string) {
+  return run(async () => LA.deleteTerm(await getCtx("catalog:manage"), id), "Palabra eliminada.", ["/admin/assistant"]);
 }

@@ -12,17 +12,17 @@ datasource db {
 }
 
 enum Role {
-  SUPER_ADMIN      // Superadministrador SaaS (sin organización)
-  ORG_ADMIN        // Administrador de organización
-  SERVICE_MANAGER  // Gestor de servicios
-  AGENT            // Agente de soporte
-  APPROVER         // Aprobador
-  END_USER         // Usuario final
+  SUPER_ADMIN // Superadministrador SaaS (sin organización)
+  ORG_ADMIN // Administrador de organización
+  SERVICE_MANAGER // Gestor de servicios
+  AGENT // Agente de soporte
+  APPROVER // Aprobador
+  END_USER // Usuario final
 }
 
 enum TicketType {
   INCIDENT // "Tengo un problema"
-  REQUEST  // "Quiero solicitar algo"
+  REQUEST // "Quiero solicitar algo"
 }
 
 enum TicketStatus {
@@ -73,71 +73,75 @@ model Organization {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  users         User[]
-  departments   Department[]
-  teams         Team[]
-  categories    Category[]
-  services      ServiceItem[]
-  slaPolicies   SlaPolicy[]
-  calendars     BusinessCalendar[]
-  tickets       Ticket[]
-  articles      KbArticle[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
-  problems      Problem[]
-  changes       Change[]
-  configItems   ConfigItem[]
-  workLogs      WorkLog[]
-  aiUsage       AiUsage[]
-  automations   AutomationRule[]
-  integrations  Integration[]
-  apiKeys       ApiKey[]
+  users                 User[]
+  departments           Department[]
+  teams                 Team[]
+  categories            Category[]
+  services              ServiceItem[]
+  slaPolicies           SlaPolicy[]
+  calendars             BusinessCalendar[]
+  tickets               Ticket[]
+  articles              KbArticle[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  problems              Problem[]
+  changes               Change[]
+  configItems           ConfigItem[]
+  workLogs              WorkLog[]
+  aiUsage               AiUsage[]
+  automations           AutomationRule[]
+  integrations          Integration[]
+  apiKeys               ApiKey[]
+  assistantInteractions AssistantInteraction[]
+  assistantTerms        AssistantTerm[]
+  learnedSolutions      LearnedSolution[]
 }
 
 model User {
-  id             String    @id @default(cuid())
-  orgId          String?
-  org            Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  email          String    @unique
-  name           String
-  passwordHash   String
-  role           Role      @default(END_USER)
-  title          String?
-  departmentId   String?
-  department     Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  managerId      String?
-  manager        User?     @relation("Manager", fields: [managerId], references: [id], onDelete: SetNull)
-  reports        User[]    @relation("Manager")
-  isActive       Boolean   @default(true)
-  failedLogins   Int       @default(0)
-  lockedUntil    DateTime?
-  lastLoginAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id           String        @id @default(cuid())
+  orgId        String?
+  org          Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email        String        @unique
+  name         String
+  passwordHash String
+  role         Role          @default(END_USER)
+  title        String?
+  departmentId String?
+  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  managerId    String?
+  manager      User?         @relation("Manager", fields: [managerId], references: [id], onDelete: SetNull)
+  reports      User[]        @relation("Manager")
+  isActive     Boolean       @default(true)
+  failedLogins Int           @default(0)
+  lockedUntil  DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  sessions         Session[]
-  resetTokens      PasswordResetToken[]
-  memberships      TeamMember[]
-  requested        Ticket[]   @relation("Requester")
-  assigned         Ticket[]   @relation("Assignee")
-  comments         TicketComment[]
-  activities       TicketActivity[]
-  approvals        Approval[]
-  notifications    Notification[]
-  ownedServices    ServiceItem[] @relation("ServiceOwner")
-  approverServices ServiceItem[] @relation("ServiceApprover")
-  articles         KbArticle[]
-  articleFeedback  KbFeedback[]
-  problemsOwned    Problem[]  @relation("ProblemOwner")
-  problemsCreated  Problem[]  @relation("ProblemCreator")
-  problemTasks     ProblemTask[]
-  changesRequested Change[]   @relation("ChangeRequester")
-  changesOwned     Change[]   @relation("ChangeOwner")
-  changeApprovals  ChangeApproval[]
-  ciOwned          ConfigItem[]
-  workLogs         WorkLog[]
-  secondApproverServices ServiceItem[] @relation("ServiceSecondApprover")
-  apiKeys          ApiKey[]
+  sessions               Session[]
+  resetTokens            PasswordResetToken[]
+  memberships            TeamMember[]
+  requested              Ticket[]               @relation("Requester")
+  assigned               Ticket[]               @relation("Assignee")
+  comments               TicketComment[]
+  activities             TicketActivity[]
+  approvals              Approval[]
+  notifications          Notification[]
+  ownedServices          ServiceItem[]          @relation("ServiceOwner")
+  approverServices       ServiceItem[]          @relation("ServiceApprover")
+  articles               KbArticle[]
+  articleFeedback        KbFeedback[]
+  problemsOwned          Problem[]              @relation("ProblemOwner")
+  problemsCreated        Problem[]              @relation("ProblemCreator")
+  problemTasks           ProblemTask[]
+  changesRequested       Change[]               @relation("ChangeRequester")
+  changesOwned           Change[]               @relation("ChangeOwner")
+  changeApprovals        ChangeApproval[]
+  ciOwned                ConfigItem[]
+  workLogs               WorkLog[]
+  secondApproverServices ServiceItem[]          @relation("ServiceSecondApprover")
+  apiKeys                ApiKey[]
+  assistantInteractions  AssistantInteraction[]
 
   @@index([orgId, role])
 }
@@ -167,7 +171,7 @@ model PasswordResetToken {
 }
 
 model Department {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name  String
@@ -177,20 +181,20 @@ model Department {
 }
 
 model Team {
-  id          String @id @default(cuid())
+  id          String       @id @default(cuid())
   orgId       String
   org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name        String
   description String?
-  autoAssign  Boolean @default(true)
-  createdAt   DateTime @default(now())
+  autoAssign  Boolean      @default(true)
+  createdAt   DateTime     @default(now())
 
-  members    TeamMember[]
-  tickets    Ticket[]
-  categories Category[]
-  services   ServiceItem[]
-  problems   Problem[]
-  changes    Change[]
+  members     TeamMember[]
+  tickets     Ticket[]
+  categories  Category[]
+  services    ServiceItem[]
+  problems    Problem[]
+  changes     Change[]
   configItems ConfigItem[]
 
   @@unique([orgId, name])
@@ -198,105 +202,106 @@ model Team {
 
 model TeamMember {
   teamId String
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team   Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   isLead Boolean @default(false)
 
   @@id([teamId, userId])
 }
 
 model Category {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name      String
-  icon      String   @default("folder")
-  color     String   @default("slate")
+  icon      String       @default("folder")
+  color     String       @default("slate")
   keywords  String[] // usadas por la clasificación automática
   teamId    String?
-  team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  team      Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt DateTime     @default(now())
 
-  services ServiceItem[]
-  tickets  Ticket[]
-  articles KbArticle[]
-  problems Problem[]
+  services         ServiceItem[]
+  tickets          Ticket[]
+  articles         KbArticle[]
+  problems         Problem[]
+  learnedSolutions LearnedSolution[]
 
   @@unique([orgId, name])
 }
 
 // Elemento del catálogo de servicios
 model ServiceItem {
-  id               String   @id @default(cuid())
+  id               String       @id @default(cuid())
   orgId            String
   org              Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name             String
   description      String
-  icon             String   @default("package")
+  icon             String       @default("package")
   categoryId       String?
-  category         Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  estimatedHours   Int      @default(24)
+  category         Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  estimatedHours   Int          @default(24)
   requirements     String?
   // [{ key, label, type: text|textarea|select|date|number, required, options[], sensitive }]
-  formSchema       Json     @default("[]")
-  requiresApproval Boolean  @default(false)
+  formSchema       Json         @default("[]")
+  requiresApproval Boolean      @default(false)
   // "MANAGER" = jefe directo del solicitante; "USER" = aprobador fijo
-  approvalMode     String   @default("MANAGER")
+  approvalMode     String       @default("MANAGER")
   approverId       String?
-  approver         User?    @relation("ServiceApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  approver         User?        @relation("ServiceApprover", fields: [approverId], references: [id], onDelete: SetNull)
   // Aprobación multinivel: segundo nivel opcional (p. ej. TI o Finanzas)
   secondApproverId String?
-  secondApprover   User?    @relation("ServiceSecondApprover", fields: [secondApproverId], references: [id], onDelete: SetNull)
+  secondApprover   User?        @relation("ServiceSecondApprover", fields: [secondApproverId], references: [id], onDelete: SetNull)
   ownerTeamId      String?
-  ownerTeam        Team?    @relation(fields: [ownerTeamId], references: [id], onDelete: SetNull)
+  ownerTeam        Team?        @relation(fields: [ownerTeamId], references: [id], onDelete: SetNull)
   ownerId          String?
-  owner            User?    @relation("ServiceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  defaultPriority  Priority @default(P3)
-  isActive         Boolean  @default(true)
-  popularity       Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  owner            User?        @relation("ServiceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  defaultPriority  Priority     @default(P3)
+  isActive         Boolean      @default(true)
+  popularity       Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   tickets Ticket[]
 }
 
 model BusinessCalendar {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name      String
-  timezone  String   @default("America/Santiago")
-  workDays  Int[]    // 0=domingo ... 6=sábado
-  startTime String   @default("09:00")
-  endTime   String   @default("18:00")
-  is24x7    Boolean  @default(false)
+  timezone  String       @default("America/Santiago")
+  workDays  Int[] // 0=domingo ... 6=sábado
+  startTime String       @default("09:00")
+  endTime   String       @default("18:00")
+  is24x7    Boolean      @default(false)
   holidays  Holiday[]
   policies  SlaPolicy[]
 }
 
 model Holiday {
-  id         String   @id @default(cuid())
+  id         String           @id @default(cuid())
   calendarId String
   calendar   BusinessCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
-  date       String   // YYYY-MM-DD en la zona horaria del calendario
+  date       String // YYYY-MM-DD en la zona horaria del calendario
   name       String
 
   @@unique([calendarId, date])
 }
 
 model SlaPolicy {
-  id                String   @id @default(cuid())
+  id                String            @id @default(cuid())
   orgId             String
-  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org               Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name              String
   priority          Priority
   responseMinutes   Int
   resolutionMinutes Int
   calendarId        String?
   calendar          BusinessCalendar? @relation(fields: [calendarId], references: [id], onDelete: SetNull)
-  warnPercent       Int      @default(75) // alerta al consumir este % del tiempo
-  isActive          Boolean  @default(true)
+  warnPercent       Int               @default(75) // alerta al consumir este % del tiempo
+  isActive          Boolean           @default(true)
 
   tickets Ticket[]
 
@@ -304,65 +309,65 @@ model SlaPolicy {
 }
 
 model Ticket {
-  id              String         @id @default(cuid())
-  orgId           String
-  org             Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  number          Int
-  type            TicketType
-  title           String
-  description     String
-  status          TicketStatus   @default(NEW)
-  pendingReason   String?
-  impact          Level          @default(LOW)
-  urgency         Level          @default(LOW)
-  priority        Priority       @default(P4)
-  channel         String         @default("portal")
-  categoryId      String?
-  category        Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  serviceItemId   String?
-  serviceItem     ServiceItem?   @relation(fields: [serviceItemId], references: [id], onDelete: SetNull)
-  formData        Json?          // respuestas del formulario (campos sensibles cifrados)
-  requesterId     String
-  requester       User           @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
-  assigneeId      String?
-  assignee        User?          @relation("Assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  teamId          String?
-  team            Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  approvalStatus  ApprovalStatus @default(NOT_REQUIRED)
+  id             String         @id @default(cuid())
+  orgId          String
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  number         Int
+  type           TicketType
+  title          String
+  description    String
+  status         TicketStatus   @default(NEW)
+  pendingReason  String?
+  impact         Level          @default(LOW)
+  urgency        Level          @default(LOW)
+  priority       Priority       @default(P4)
+  channel        String         @default("portal")
+  categoryId     String?
+  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  serviceItemId  String?
+  serviceItem    ServiceItem?   @relation(fields: [serviceItemId], references: [id], onDelete: SetNull)
+  formData       Json? // respuestas del formulario (campos sensibles cifrados)
+  requesterId    String
+  requester      User           @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  assigneeId     String?
+  assignee       User?          @relation("Assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  teamId         String?
+  team           Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  approvalStatus ApprovalStatus @default(NOT_REQUIRED)
 
   // SLA
-  slaPolicyId     String?
-  slaPolicy       SlaPolicy?     @relation(fields: [slaPolicyId], references: [id], onDelete: SetNull)
-  responseDueAt   DateTime?
-  resolutionDueAt DateTime?
-  firstResponseAt DateTime?
-  slaPausedAt     DateTime?
-  slaPausedMinutes Int           @default(0)
-  responseBreached   Boolean     @default(false)
-  resolutionBreached Boolean     @default(false)
-  slaWarned       Boolean        @default(false)
-  escalationLevel Int            @default(0)
+  slaPolicyId        String?
+  slaPolicy          SlaPolicy? @relation(fields: [slaPolicyId], references: [id], onDelete: SetNull)
+  responseDueAt      DateTime?
+  resolutionDueAt    DateTime?
+  firstResponseAt    DateTime?
+  slaPausedAt        DateTime?
+  slaPausedMinutes   Int        @default(0)
+  responseBreached   Boolean    @default(false)
+  resolutionBreached Boolean    @default(false)
+  slaWarned          Boolean    @default(false)
+  escalationLevel    Int        @default(0)
 
-  resolution      String?
-  resolvedAt      DateTime?
-  closedAt        DateTime?
-  reopenCount     Int            @default(0)
-  csatScore       Int?
-  csatComment     String?
-  problemId       String?
-  problem         Problem?       @relation(fields: [problemId], references: [id], onDelete: SetNull)
-  aiSuggestion    Json?          // sugerencia de triage de la IA (no se aplica sola salvo categoría con alta confianza)
-  aiSummary       String?
-  aiSummaryAt     DateTime?
-  configItemId    String?
-  configItem      ConfigItem?    @relation(fields: [configItemId], references: [id], onDelete: SetNull)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  resolution   String?
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  reopenCount  Int         @default(0)
+  csatScore    Int?
+  csatComment  String?
+  problemId    String?
+  problem      Problem?    @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  aiSuggestion Json? // sugerencia de triage de la IA (no se aplica sola salvo categoría con alta confianza)
+  aiSummary    String?
+  aiSummaryAt  DateTime?
+  configItemId String?
+  configItem   ConfigItem? @relation(fields: [configItemId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  linkedArticles KbArticle[]   @relation("TicketArticles")
-  comments   TicketComment[]
-  activities TicketActivity[]
-  approvals  Approval[]
+  linkedArticles KbArticle[]      @relation("TicketArticles")
+  comments       TicketComment[]
+  activities     TicketActivity[]
+  approvals      Approval[]
 
   @@unique([orgId, number])
   @@index([orgId, status])
@@ -391,7 +396,7 @@ model TicketActivity {
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   actorId   String?
   actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  action    String   // created, status, assigned, priority, escalated, approval, comment, reopened, csat
+  action    String // created, status, assigned, priority, escalated, approval, comment, reopened, csat
   fromValue String?
   toValue   String?
   note      String?
@@ -422,7 +427,7 @@ model KbArticle {
   title      String
   slug       String
   summary    String
-  body       String        // texto con pasos; líneas "1. ..." se muestran como paso a paso
+  body       String // texto con pasos; líneas "1. ..." se muestran como paso a paso
   categoryId String?
   category   Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   tags       String[]
@@ -437,8 +442,8 @@ model KbArticle {
   updatedAt  DateTime      @updatedAt
 
   feedback KbFeedback[]
-  tickets  Ticket[]  @relation("TicketArticles")
-  problems Problem[] @relation("ProblemArticles")
+  tickets  Ticket[]     @relation("TicketArticles")
+  problems Problem[]    @relation("ProblemArticles")
 
   @@unique([orgId, slug])
 }
@@ -455,23 +460,23 @@ model KbFeedback {
 }
 
 model Notification {
-  id        String    @id @default(cuid())
+  id        String       @id @default(cuid())
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  kind      String    @default("info") // info | success | warning | danger
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String       @default("info") // info | success | warning | danger
   title     String
   body      String?
   link      String?
   readAt    DateTime?
-  createdAt DateTime  @default(now())
+  createdAt DateTime     @default(now())
 
   @@index([userId, readAt])
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   orgId     String?
   org       Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
   actorId   String?
@@ -481,7 +486,7 @@ model AuditLog {
   entityId  String?
   meta      Json?
   ip        String?
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
 
   @@index([orgId, createdAt])
 }
@@ -492,46 +497,46 @@ model AuditLog {
 
 enum ProblemStatus {
   NEW
-  INVESTIGATING  // Análisis de causa raíz
-  KNOWN_ERROR    // Causa identificada, solución temporal disponible
-  RESOLVED       // Solución definitiva aplicada
+  INVESTIGATING // Análisis de causa raíz
+  KNOWN_ERROR // Causa identificada, solución temporal disponible
+  RESOLVED // Solución definitiva aplicada
   CLOSED
 }
 
 model Problem {
-  id             String        @id @default(cuid())
-  orgId          String
-  org            Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  number         Int
-  title          String
-  description    String
-  status         ProblemStatus @default(NEW)
-  priority       Priority      @default(P3)
-  impact         Level         @default(MEDIUM)
-  urgency        Level         @default(MEDIUM)
-  categoryId     String?
-  category       Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  teamId         String?
-  team           Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  ownerId        String?
-  owner          User?         @relation("ProblemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  createdById    String
-  createdBy      User          @relation("ProblemCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  rcaMethod      String?       // five_whys | ishikawa | timeline | other
-  rootCause      String?
-  workaround     String?
-  permanentFix   String?
-  knownErrorAt   DateTime?
-  resolvedAt     DateTime?
-  closedAt       DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id           String        @id @default(cuid())
+  orgId        String
+  org          Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  number       Int
+  title        String
+  description  String
+  status       ProblemStatus @default(NEW)
+  priority     Priority      @default(P3)
+  impact       Level         @default(MEDIUM)
+  urgency      Level         @default(MEDIUM)
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  teamId       String?
+  team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  ownerId      String?
+  owner        User?         @relation("ProblemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById  String
+  createdBy    User          @relation("ProblemCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  rcaMethod    String? // five_whys | ishikawa | timeline | other
+  rootCause    String?
+  workaround   String?
+  permanentFix String?
+  knownErrorAt DateTime?
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   incidents   Ticket[]
   tasks       ProblemTask[]
   changes     Change[]
-  configItems ConfigItem[] @relation("ProblemCIs")
-  articles    KbArticle[]  @relation("ProblemArticles")
+  configItems ConfigItem[]  @relation("ProblemCIs")
+  articles    KbArticle[]   @relation("ProblemArticles")
 
   @@unique([orgId, number])
   @@index([orgId, status])
@@ -544,24 +549,24 @@ model ProblemTask {
   title     String
   ownerId   String?
   owner     User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  dueDate   String?   // YYYY-MM-DD
+  dueDate   String? // YYYY-MM-DD
   doneAt    DateTime?
   createdAt DateTime  @default(now())
 }
 
 enum ChangeType {
-  STANDARD   // preaprobado, bajo riesgo, repetible
-  NORMAL     // requiere evaluación y aprobación (CAB)
-  EMERGENCY  // aprobación acelerada (ECAB)
+  STANDARD // preaprobado, bajo riesgo, repetible
+  NORMAL // requiere evaluación y aprobación (CAB)
+  EMERGENCY // aprobación acelerada (ECAB)
 }
 
 enum ChangeStatus {
   DRAFT
-  ASSESSMENT        // evaluación de riesgo e impacto
-  PENDING_APPROVAL  // CAB
-  SCHEDULED         // aprobado y programado
-  IN_PROGRESS       // en implementación
-  REVIEW            // validación posterior a la implementación
+  ASSESSMENT // evaluación de riesgo e impacto
+  PENDING_APPROVAL // CAB
+  SCHEDULED // aprobado y programado
+  IN_PROGRESS // en implementación
+  REVIEW // validación posterior a la implementación
   CLOSED
   REJECTED
   CANCELLED
@@ -581,7 +586,7 @@ model Change {
   number             Int
   title              String
   description        String
-  reason             String?        // justificación de negocio
+  reason             String? // justificación de negocio
   type               ChangeType     @default(NORMAL)
   status             ChangeStatus   @default(DRAFT)
   risk               Level          @default(MEDIUM)
@@ -609,7 +614,7 @@ model Change {
   updatedAt          DateTime       @updatedAt
 
   approvals   ChangeApproval[]
-  configItems ConfigItem[] @relation("ChangeCIs")
+  configItems ConfigItem[]     @relation("ChangeCIs")
 
   @@unique([orgId, number])
   @@index([orgId, status])
@@ -622,7 +627,7 @@ model ChangeApproval {
   change     Change         @relation(fields: [changeId], references: [id], onDelete: Cascade)
   approverId String
   approver   User           @relation(fields: [approverId], references: [id], onDelete: Cascade)
-  level      Int            @default(1)  // 1 = CAB, 2 = Dirección (riesgo alto)
+  level      Int            @default(1) // 1 = CAB, 2 = Dirección (riesgo alto)
   status     ApprovalStatus @default(PENDING)
   comment    String?
   decidedAt  DateTime?
@@ -632,12 +637,12 @@ model ChangeApproval {
 }
 
 enum CiType {
-  HARDWARE     // equipos
+  HARDWARE // equipos
   SERVER
   APPLICATION
   LICENSE
-  SERVICE      // servicio tecnológico
-  VENDOR       // proveedor
+  SERVICE // servicio tecnológico
+  VENDOR // proveedor
   NETWORK
   DATABASE
 }
@@ -649,34 +654,34 @@ enum CiStatus {
 }
 
 model ConfigItem {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   orgId       String
   org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name        String
   type        CiType
-  status      CiStatus  @default(ACTIVE)
-  criticality Level     @default(MEDIUM)
+  status      CiStatus     @default(ACTIVE)
+  criticality Level        @default(MEDIUM)
   description String?
   ownerId     String?
-  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  owner       User?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   teamId      String?
-  team        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  team        Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
   serial      String?
   location    String?
   ipAddress   String?
   version     String?
-  seats       Int?      // licencias
+  seats       Int? // licencias
   seatsUsed   Int?
-  expiresAt   String?   // YYYY-MM-DD (licencias, garantías, contratos)
-  contact     String?   // proveedores
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  expiresAt   String? // YYYY-MM-DD (licencias, garantías, contratos)
+  contact     String? // proveedores
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  outgoing  CiRelation[] @relation("RelSource")
-  incoming  CiRelation[] @relation("RelTarget")
-  tickets   Ticket[]
-  problems  Problem[]    @relation("ProblemCIs")
-  changes   Change[]     @relation("ChangeCIs")
+  outgoing CiRelation[] @relation("RelSource")
+  incoming CiRelation[] @relation("RelTarget")
+  tickets  Ticket[]
+  problems Problem[]    @relation("ProblemCIs")
+  changes  Change[]     @relation("ChangeCIs")
 
   @@unique([orgId, name])
   @@index([orgId, type])
@@ -696,16 +701,16 @@ model CiRelation {
 
 // Bitácora genérica para problemas y cambios (actividad + notas de trabajo)
 model WorkLog {
-  id         String   @id @default(cuid())
+  id         String       @id @default(cuid())
   orgId      String
   org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  entityType String   // problem | change
+  entityType String // problem | change
   entityId   String
   actorId    String?
-  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actor      User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
   action     String
   note       String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime     @default(now())
 
   @@index([entityType, entityId])
 }
@@ -722,84 +727,155 @@ model JobLock {
 
 // Registro de uso de IA: transparencia y control de costos por organización
 model AiUsage {
-  id           String   @id @default(cuid())
+  id           String       @id @default(cuid())
   orgId        String
   org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   userId       String?
-  feature      String   // triage | summary | reply | rca | trends | selfhelp
+  feature      String // triage | summary | reply | rca | trends | selfhelp
   model        String
-  inputTokens  Int      @default(0)
-  outputTokens Int      @default(0)
-  ms           Int      @default(0)
-  ok           Boolean  @default(true)
+  inputTokens  Int          @default(0)
+  outputTokens Int          @default(0)
+  ms           Int          @default(0)
+  ok           Boolean      @default(true)
   error        String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime     @default(now())
 
   @@index([orgId, createdAt])
 }
 
 model AutomationRule {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   orgId       String
   org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name        String
   description String?
-  trigger     String   // ticket.created | ticket.reopened | sla.warning | sla.breached
-  conditions  Json     @default("[]") // [{ field, op, value }]
-  actions     Json     @default("[]") // [{ type, value }]
-  isActive    Boolean  @default(true)
-  position    Int      @default(0)
-  runCount    Int      @default(0)
+  trigger     String // ticket.created | ticket.reopened | sla.warning | sla.breached
+  conditions  Json         @default("[]") // [{ field, op, value }]
+  actions     Json         @default("[]") // [{ type, value }]
+  isActive    Boolean      @default(true)
+  position    Int          @default(0)
+  runCount    Int          @default(0)
   lastRunAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([orgId, trigger, isActive])
 }
 
 model Integration {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   orgId          String
   org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  type           String   // teams | slack | webhook
+  type           String // teams | slack | webhook
   name           String
-  configEnc      String   // JSON cifrado (URL, secreto): las URLs de webhook son credenciales
+  configEnc      String // JSON cifrado (URL, secreto): las URLs de webhook son credenciales
   events         String[]
-  isActive       Boolean  @default(true)
+  isActive       Boolean      @default(true)
   lastDeliveryAt DateTime?
   lastStatus     String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   deliveries IntegrationDelivery[]
 }
 
 model IntegrationDelivery {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   integrationId String
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   event         String
   ok            Boolean
   status        Int?
   error         String?
-  ms            Int      @default(0)
-  createdAt     DateTime @default(now())
+  ms            Int         @default(0)
+  createdAt     DateTime    @default(now())
 
   @@index([integrationId, createdAt])
 }
 
 // Claves para la API REST. Se guarda solo el hash; la clave se muestra una vez.
 model ApiKey {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   orgId       String
   org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name        String
-  prefix      String    // primeros caracteres visibles para identificarla
-  keyHash     String    @unique
-  scope       String    @default("read") // read | read_write
+  prefix      String // primeros caracteres visibles para identificarla
+  keyHash     String       @unique
+  scope       String       @default("read") // read | read_write
   createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
   lastUsedAt  DateTime?
   revokedAt   DateTime?
   expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime     @default(now())
+}
+
+// ------------------------------------------------------------------ Aprendizaje del asistente
+/**
+ * Cada respuesta del asistente del portal y lo que la persona hizo con ella (se borra a los 180 días).
+ */
+model AssistantInteraction {
+  id             String       @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query          String // último mensaje de la persona (recortado)
+  intent         String
+  mode           String // ai | basic
+  articleIds     String[]
+  serviceId      String?
+  solutionIds    String[]
+  proposedTicket Boolean      @default(false)
+  feedback       Int? // 1 = le sirvió, -1 = no le sirvió
+  outcome        String? // service | self_resolved | ticket
+  outcomeTarget  String?
+  ticketId       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([orgId, createdAt])
+}
+
+/**
+ * Vocabulario aprendido: palabras de las personas que llevaron a un servicio, guía o solución.
+ */
+model AssistantTerm {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  term       String // raíz normalizada (p. ej. "compu")
+  targetType String // SERVICE | ARTICLE | SOLUTION
+  targetId   String
+  positive   Int          @default(0)
+  negative   Int          @default(0)
+  disabled   Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([orgId, term, targetType, targetId])
+  @@index([orgId, term])
+}
+
+/**
+ * Soluciones que funcionaron, aprendidas de incidentes resueltos. Solo título y solución (sin datos del solicitante).
+ */
+model LearnedSolution {
+  id                 String       @id @default(cuid())
+  orgId              String
+  org                Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ticketIds          String[] // incidentes resueltos que respaldan esta solución
+  categoryId         String?
+  category           Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  title              String
+  resolution         String
+  originalResolution String // texto tal como lo registró el agente (para agrupar casos aunque un admin la edite)
+  status             String       @default("ACTIVE") // ACTIVE | HIDDEN
+  hiddenReason       String?
+  manual             Boolean      @default(false) // un administrador decidió: no se cambia automáticamente
+  shown              Int          @default(0)
+  helpful            Int          @default(0)
+  notHelpful         Int          @default(0)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([orgId, status])
 }

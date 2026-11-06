@@ -45,7 +45,7 @@ conflicto de calendario; uno esperando al CAB).
 npm test               # unitarias: motor SLA (zonas horarias, feriados, pausas), matriz de prioridad, clasificación, RBAC, cifrado
 npm run test:e2e       # Fase 1 con Playwright contra el servidor en marcha (resiembra antes: npm run db:seed)
 npm run test:e2e:2     # Fase 2: problemas, cambios con CAB multinivel, CMDB, aprobación multinivel, aislamiento
-npm run test:e2e:x     # Portal del empleado / Operaciones TI, catálogo visual y asistente (modo básico, sin IA)
+npm run test:e2e:x     # Portal del empleado / Operaciones TI, catálogo visual, asistente (modo básico) y su aprendizaje
 # Fase 3: IA (contra un simulador que valida cada petición), automatizaciones, predicción, webhooks y claves de API
 npm run mock:anthropic &   # simulador en :4010
 ANTHROPIC_API_KEY=sk-test ANTHROPIC_BASE_URL=http://localhost:4010 ALLOW_PRIVATE_WEBHOOKS=true npm start &

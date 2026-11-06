@@ -250,6 +250,27 @@ async function main() {
     "Aplicamos una corrección. ¿Puedes confirmar si ya funciona?",
     "Gracias por la información, con eso puedo avanzar.",
   ];
+  // Solución coherente por tipo de incidente (el asistente aprende de estas soluciones)
+  const FIX: Record<string, string> = {
+      "No puedo abrir Outlook, se queda cargando": "Cerrar Outlook, abrir Panel de control → Correo → Mostrar perfiles, crear un perfil nuevo y dejarlo como predeterminado. Al abrir Outlook descarga el buzón y vuelve a funcionar.",
+      "Internet muy lento en el segundo piso": "Se reinició el switch del segundo piso y se limitó el ancho de banda de las actualizaciones automáticas en horario laboral.",
+      "La impresora de Finanzas no imprime": "Apagar la impresora, abrir la bandeja trasera y retirar el trozo de papel atascado en el rodillo. Encender y cancelar los trabajos pendientes en la cola de impresión.",
+      "SAP no deja contabilizar facturas": "Finanzas abrió el período contable del mes en SAP (transacción OB52). Las facturas se contabilizan con normalidad.",
+      "Mi notebook no enciende": "Desconectar el cargador, mantener presionado el botón de encendido 30 segundos para descargar la batería y volver a conectar. Si no enciende, se reemplaza el cargador.",
+      "No me funciona la VPN desde casa": "En FortiClient borrar el usuario guardado y volver a escribirlo con el formato nombre.apellido (sin @andes.cl). Si sigue fallando, revisar que la cuenta no esté bloqueada.",
+      "Teams no tiene audio en las reuniones": "En Teams ir a Configuración → Dispositivos y elegir el micrófono correcto. En Windows, Privacidad → Micrófono → permitir que las apps de escritorio usen el micrófono.",
+      "Cuenta bloqueada, no puedo iniciar sesión": "Esperar 15 minutos (la cuenta se desbloquea sola) o usar «Restablecer mi contraseña» del catálogo. Se desbloqueó la cuenta y se guió el cambio de contraseña.",
+      "El sistema de bodega WMS está caído": "Se reinició el servicio de aplicación del WMS y se liberaron las conexiones a la base de datos. El despacho opera normalmente.",
+      "Excel se cierra solo al abrir archivos grandes": "Abrir Excel en modo seguro (mantener Ctrl al abrir) y desactivar los complementos COM. Se actualizó Office a la última versión.",
+      "Pantalla del monitor parpadea": "Se cambió el cable HDMI por uno nuevo y se ajustó la frecuencia de actualización a 60 Hz en Configuración de pantalla.",
+      "Salesforce muy lento para cargar oportunidades": "Se limpió la caché del navegador y se desactivó la extensión de traducción que interfería con Salesforce.",
+      "No recibo correos externos": "Revisar la carpeta Correo no deseado y la cuarentena de Microsoft 365. Se liberó el remitente y se agregó a la lista de remitentes seguros.",
+      "Wi-Fi se desconecta en sala de reuniones": "Se reconfiguró el punto de acceso Wi-Fi de la sala y se actualizó su firmware.",
+      "Mi anexo telefónico no tiene tono": "Se reasignó el anexo al nuevo puesto en la central telefónica y se revisó el cable de red del teléfono.",
+      "Reporte de facturación no se genera": "Se ejecutó el reporte en segundo plano (job nocturno) y se aumentó el tiempo de espera del servidor de reportes.",
+      "Escáner no envía al correo": "Se actualizó la contraseña de la cuenta de envío SMTP configurada en el escáner.",
+      "Sin internet en toda la oficina de Antofagasta": "El proveedor restableció el enlace tras un corte de fibra. Se verificó la conectividad de la sucursal."
+  };
   const resolutions = [
     "Se reinició el servicio y se limpió la caché del perfil. Funcionando correctamente.",
     "Se reemplazó el cargador defectuoso. Equipo operativo.",
@@ -297,7 +318,7 @@ async function main() {
         resolutionBreached: (!!safeResolvedAt && safeResolvedAt > resolutionDueAt) || (openBreached && status !== "PENDING"),
         slaWarned: !done && status !== "PENDING" && (resolutionDueAt.getTime() - now) / (resolutionDueAt.getTime() - createdAt.getTime()) < 0.25,
         escalationLevel: openBreached && status !== "PENDING" ? 1 : 0,
-        resolution: safeResolvedAt ? pick(resolutions) : opts.approval?.status === "REJECTED" ? "Rechazada: no corresponde a las funciones del cargo." : null,
+        resolution: safeResolvedAt ? (opts.type === "INCIDENT" && FIX[opts.title]) || pick(resolutions) : opts.approval?.status === "REJECTED" ? "Rechazada: no corresponde a las funciones del cargo." : null,
         resolvedAt: safeResolvedAt, closedAt: status === "CLOSED" ? new Date((safeResolvedAt ?? createdAt).getTime() + 86400_000 * 0.5) : null,
         csatScore: csat, csatComment: csat && csat >= 5 && chance(0.4) ? pick(["¡Muy rápido, gracias!", "Excelente atención de Camila.", "Resolvieron todo en minutos."]) : csat && csat <= 2 ? "Demoró demasiado." : null,
         reopenCount: chance(0.05) ? 1 : 0,
@@ -482,6 +503,10 @@ async function main() {
   await db.organization.update({ where: { id: org2.id }, data: { ticketSeq: 1 } });
 
   const count = await db.ticket.count({ where: { orgId: O } });
+  // El asistente aprende de los incidentes resueltos de la demo
+  const { syncLearning } = await import("../src/server/learning");
+  const learned = await syncLearning(O);
+  console.log(`  Asistente: ${learned.learned} casos resueltos revisados para aprender soluciones.`);
   console.log(`✔ Listo: ${count} tickets en «${org.name}», ${services.length} servicios, 10 artículos, ${await db.configItem.count({ where: { orgId: O } })} elementos CMDB, ${prbSeq - 100} problemas, ${chgSeq - 100} cambios.`);
   console.log(`  Contraseña de todos los usuarios demo: ${PASSWORD}`);
 }

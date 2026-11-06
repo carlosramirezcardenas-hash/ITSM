@@ -196,3 +196,12 @@ test("Asistente: coincidencia por raíces tolera plurales y acentos", async () =
   assert.equal(matchScore("vpn", "Correo y calendario"), 0);
   assert.equal(matchScore("", "algo"), 0);
 });
+
+test("Aprendizaje: solo se aprenden palabras nuevas y no genéricas", async () => {
+  process.env.DATABASE_URL ??= "postgresql://x@localhost/x"; // learning.ts importa el cliente de BD (no se conecta en esta prueba)
+  const { learnableTerms } = await import("../src/server/learning");
+  // «notebook» ya está en el servicio y «necesito» es genérica: solo se aprende «compu»
+  assert.deepEqual(learnableTerms("necesito un compu", "Solicitar un notebook nuevo"), ["compu"]);
+  assert.deepEqual(learnableTerms("cuando abro excel", "Excel se cierra solo"), []);
+  assert.ok(learnableTerms("a b c d e f g h i j k l m n o p", "x").length <= 6);
+});

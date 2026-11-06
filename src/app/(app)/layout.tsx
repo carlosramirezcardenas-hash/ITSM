@@ -64,6 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
     if (can(r, "sla:manage")) admin.items.push({ href: "/admin/sla", label: "SLA y horarios", icon: "timer" });
     if (can(r, "catalog:manage")) admin.items.push({ href: "/admin/automations", label: "Automatizaciones", icon: "workflow" });
+    if (can(r, "catalog:manage")) admin.items.push({ href: "/admin/assistant", label: "Asistente y aprendizaje", icon: "bot" });
     if (can(r, "org:manage")) admin.items.push({ href: "/admin/integrations", label: "Integraciones e IA", icon: "plug" });
     if (can(r, "audit:view")) admin.items.push({ href: "/admin/audit", label: "Auditoría", icon: "audit" });
     if (can(r, "org:manage")) admin.items.push({ href: "/admin/settings", label: "Organización", icon: "settings" });

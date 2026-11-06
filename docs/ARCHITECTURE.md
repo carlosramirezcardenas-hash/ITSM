@@ -161,6 +161,27 @@ urgencia deducidos). **Nunca crea nada por su cuenta**: el reporte se envía sol
 - Sin IA, o si la llamada falla: **modo básico** con reglas (raíces de palabras, palabras clave por categoría,
   catálogo y centro de ayuda). El chat indica en qué modo respondió.
 
+### Aprendizaje del asistente (sin reentrenar modelos)
+El asistente mejora con el uso de cada organización, de forma visible y reversible (Administración → Asistente y aprendizaje):
+
+1. **Vocabulario aprendido** (`AssistantTerm`): cuando algo le sirve a una persona (👍, «Me sirvió» o abrir el servicio
+   sugerido), las palabras nuevas de su consulta (raíces de 5 letras que no estaban en el destino y no son genéricas) se
+   asocian a ese servicio, guía o solución. Un 👎 o «No me sirvió» resta. El impulso es (positivos − 2×negativos) × 0,5,
+   acotado a [−0,6; 1]; las palabras que apuntan a 3 o más destinos se ignoran por genéricas.
+   Ej.: si alguien pidió «compu» y eligió «Solicitar un notebook», la próxima persona que diga «compu» llega directo.
+2. **Soluciones que funcionaron** (`LearnedSolution`): cada incidente resuelto con una solución de al menos 20
+   caracteres se agrega como caso a la solución igual existente o crea una nueva. Se guarda solo el título y la solución,
+   nunca quién lo pidió. Si el caso se reabre o recibe evaluación ≤ 2, deja de respaldarla; sin casos, se oculta sola.
+   El asistente las ofrece como «Así se resolvió un caso parecido», con «Me sirvió / No me sirvió».
+3. **Revisión humana**: el administrador ve métricas (resueltas sin ticket, derivadas al catálogo, 👍/👎), edita u oculta
+   soluciones (queda «revisada» y no cambia sola), desactiva o borra palabras y ve las preguntas sin buena respuesta.
+   Todo queda en auditoría.
+
+Las conversaciones se guardan recortadas (300 caracteres) y se borran a los 180 días. El aprendizaje corre al resolver
+o reabrir cada ticket. Importar el historial anterior es una acción explícita del administrador («Aprender del historial»),
+para revisar primero datos antiguos; el cron diario solo aplica la retención. Con IA, las soluciones aprendidas y el
+ranking ajustado también se entregan a Claude, que solo puede citar ids existentes.
+
 ---
 
 ## 5. Flujos principales
@@ -280,7 +301,8 @@ desarrollo (sin clave); se habilitan al definir `ANTHROPIC_API_KEY`.
 
 ### Experiencias diferenciadas ✅ implementadas y probadas
 Portal del empleado vs. Operaciones TI, catálogo visual con filas por categoría y asistente conversacional con modo
-básico sin IA (ver sección 4). Pruebas: `npm run test:e2e:x` y el paso de asistente con IA en `test:e2e:3`.
+básico sin IA, y aprendizaje del asistente (vocabulario, soluciones que funcionaron, revisión humana) (ver sección 4).
+Pruebas: `npm run test:e2e:x` (18) y el paso de asistente con IA en `test:e2e:3`.
 
 ### Aún NO implementado
 - Inicio de sesión único (SSO / Entra ID), creación de tickets desde correos entrantes, adjuntos de archivos,

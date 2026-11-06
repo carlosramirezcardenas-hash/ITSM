@@ -136,6 +136,106 @@ async function main() {
     await dlg.getByText("necesito acceso a una carpeta compartida").waitFor();
   });
 
+  console.log("Aprendizaje del asistente");
+  // Palabra inventada única por ejecución (la raíz son las 5 primeras letras): la prueba no depende de corridas anteriores
+  const slang = "qz" + Array.from({ length: 5 }, () => "bcdfghjklmnprstvw"[Math.floor(Math.random() * 17)]).join("");
+  const sofia = await session("sofia@andes.demo");
+  const ask = async (p: typeof ana, text: string) => {
+    const before = await p.locator("p.bg-subtle").count();
+    await p.getByLabel("Mensaje para el asistente").fill(text);
+    await p.getByRole("button", { name: "Enviar mensaje" }).click();
+    await p.waitForFunction((n) => document.querySelectorAll("p.bg-subtle").length > n, before, { timeout: 15000 });
+    return (await p.locator("p.bg-subtle").last().innerText());
+  };
+  await step("Ofrece una solución aprendida de casos resueltos y registra que sirvió", async () => {
+    await ana.goto("/assistant");
+    await ask(ana, "Excel se me cierra cuando abro el reporte de ventas");
+    await ana.getByText("Así se resolvió un caso parecido").waitFor();
+    await ana.getByText(/modo seguro/).waitFor();
+    await ana.getByRole("button", { name: "Me sirvió" }).first().click();
+    await ana.getByText("¡Qué bueno! Lo tendré en cuenta.").waitFor();
+  });
+  await step("Aprende vocabulario: lo que una persona enseña ayuda a la siguiente", async () => {
+    await sofia.goto("/assistant");
+    const before = await ask(sofia, `necesito un ${slang}`);
+    assert.ok(!before.includes("Solicitar un notebook"), "antes de aprender no sabe qué es la palabra");
+    await ana.goto("/assistant");
+    await ask(ana, `necesito un notebook, mi ${slang} ya tiene seis años`);
+    await ana.getByText("Para eso tenemos el servicio «Solicitar un notebook»").waitFor();
+    await ana.getByRole("link", { name: "Solicitar", exact: true }).last().click(); // elegir el servicio = señal de aprendizaje
+    await ana.waitForURL(/\/catalog\/c/);
+    await sofia.goto("/assistant");
+    const after = await ask(sofia, `necesito un ${slang}`);
+    assert.match(after, /Solicitar un notebook/, "después de aprender lleva al servicio correcto");
+  });
+  await step("«No me sirvió» en una solución: deja el reporte listo y lo registra en contra", async () => {
+    await sofia.goto("/assistant");
+    await ask(sofia, "Excel se me cierra al abrir planillas grandes");
+    await sofia.getByText("Así se resolvió un caso parecido").waitFor();
+    await sofia.getByRole("button", { name: "No me sirvió" }).first().click();
+    await sofia.getByLabel("Título del reporte").last().waitFor({ timeout: 15000 });
+  });
+
+  console.log("Administración del aprendizaje");
+  const adm = await session("admin@andes.demo");
+  const stampTitle = `Proyector de la sala ${stamp} no da imagen`;
+  await step("Un incidente resuelto se convierte en solución; si se reabre, se oculta sola", async () => {
+    const created = await ana.request.post("/api/v1/tickets", { data: { type: "INCIDENT", title: stampTitle, description: "El proyector no muestra nada." } });
+    assert.equal(created.status(), 201);
+    const t = await created.json() as { id: string };
+    const res = await adm.request.patch(`/api/v1/tickets/${t.id}`, { data: { status: "RESOLVED", resolution: "Cambiar la entrada del proyector a HDMI 2 con el botón Source del control remoto." } });
+    assert.equal(res.status(), 200);
+    const appears = async (tab: "En uso" | "Ocultas") => {
+      for (let i = 0; i < 20; i++) {
+        await adm.goto("/admin/assistant");
+        await adm.getByRole("button", { name: new RegExp(`^${tab}`) }).click();
+        if (await adm.getByText(stampTitle).count()) return;
+        await adm.waitForTimeout(500);
+      }
+      throw new Error(`no apareció en ${tab}`);
+    };
+    await appears("En uso");
+    // Otra persona con el mismo problema recibe la solución
+    await sofia.goto("/assistant");
+    await ask(sofia, `el proyector de la sala ${stamp} no da imagen`);
+    await sofia.getByText(/HDMI 2/).waitFor();
+    // Ana dice que sigue fallando → reabierto → la solución se oculta
+    await ana.goto(`/tickets/${t.id}`);
+    await ana.getByRole("button", { name: "No, sigue el problema" }).click();
+    await ana.getByLabel("Detalle").fill("Sigue sin imagen");
+    await ana.getByRole("button", { name: "Reabrir solicitud" }).click();
+    await ana.getByText("Lamentamos que siga ocurriendo").waitFor({ state: "detached" });
+    await appears("Ocultas");
+    await adm.getByText("El caso se reabrió").first().waitFor();
+  });
+  await step("El administrador edita, oculta y muestra soluciones; ve vocabulario y métricas", async () => {
+    await adm.goto("/admin/assistant");
+    await adm.getByText("Conversaciones (30 días)").waitFor();
+    const excel = adm.locator("li", { hasText: "Excel se cierra solo al abrir archivos grandes" });
+    await excel.getByText(/👍 [1-9]\d* · 👎 [1-9]/).waitFor(); // «Me sirvió» de Ana y «No me sirvió» de Sofía
+    await adm.getByText(`${slang.slice(0, 5)}…`).first().waitFor();
+    await adm.getByRole("button", { name: "Editar Excel se cierra solo al abrir archivos grandes" }).click();
+    const dlg = adm.getByRole("dialog");
+    await dlg.getByLabel("Qué hacer").fill("Abrir Excel en modo seguro (mantener Ctrl al abrir) y desactivar los complementos. Si sigue, reparar Office desde Configuración.");
+    await dlg.getByRole("button", { name: "Guardar" }).click();
+    await adm.getByText("Solución actualizada.").waitFor();
+    await adm.getByText(/reparar Office/).waitFor();
+    await adm.getByRole("button", { name: "Ocultar Excel se cierra solo al abrir archivos grandes" }).click();
+    await adm.getByText("Solución ocultada.").waitFor();
+    // oculta: el asistente ya no la ofrece
+    await sofia.goto("/assistant");
+    await ask(sofia, "Excel se cierra solo al abrir archivos grandes");
+    assert.equal(await sofia.getByText(/reparar Office/).count(), 0);
+    await adm.getByRole("button", { name: /^Ocultas/ }).click();
+    await adm.getByRole("button", { name: "Mostrar Excel se cierra solo al abrir archivos grandes" }).click();
+    await adm.getByText("Solución visible para el asistente.").waitFor();
+  });
+  await step("RBAC: un agente no administra el aprendizaje", async () => {
+    const camRbac = await session("camila@andes.demo");
+    await camRbac.goto("/admin/assistant");
+    await camRbac.waitForURL(/denied=1/);
+  });
+
   console.log("Equipo de TI (Camila, agente)");
   const cam = await session("camila@andes.demo");
   await step("El agente entra a Operaciones TI y puede cambiar al portal y volver", async () => {

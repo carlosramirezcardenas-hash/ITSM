@@ -7,6 +7,7 @@ import { classifyCategory, priorityMatrix, similarity, suggestLevels } from "@/l
 import { decrypt, encrypt, isEncrypted } from "@/lib/crypto";
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/labels";
 import { ticketRef } from "@/lib/utils";
+import { learnFromTicket } from "./learning";
 import type { Ctx } from "./auth";
 import { forbidden, invalid, notFound } from "./errors";
 import { computeSla, resumeSlaData } from "./sla";
@@ -576,6 +577,8 @@ export async function updateTicket(ctx: Ctx, id: string, raw: unknown) {
     return u;
   });
   for (const n of notifications) await notify(ctx.orgId, n.to, { title: n.title, body: n.body, kind: n.kind, link: `/tickets/${t.id}` }, ctx.user.id);
+  // El asistente aprende de las soluciones (o deja de ofrecerlas si el caso se reabre)
+  if (data.status !== undefined || data.resolution !== undefined) after(() => learnFromTicket(t.id).then(() => undefined).catch((e) => console.error("[learning]", e)));
   if (to === "RESOLVED") {
     after(async () => {
       const { dispatch } = await import("./integrations");
@@ -637,6 +640,12 @@ export async function addComment(ctx: Ctx, id: string, raw: unknown) {
 
 /** El solicitante confirma la solución (cierra) o indica que sigue el problema (reabre). */
 export async function confirmResolution(ctx: Ctx, id: string, raw: unknown) {
+  await confirmResolutionInner(ctx, id, raw);
+  // Evaluación baja o reapertura ocultan la solución aprendida; una buena evaluación la mantiene
+  after(() => learnFromTicket(id).then(() => undefined).catch((e) => console.error("[learning]", e)));
+}
+
+async function confirmResolutionInner(ctx: Ctx, id: string, raw: unknown) {
   const input = z.object({
     solved: z.boolean(),
     score: z.number().int().min(1).max(5).optional(),
