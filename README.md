@@ -28,19 +28,23 @@ Contraseña para todas: `Demo12345!` (la pantalla de inicio de sesión tiene acc
 | Usuario final | `ana@andes.demo` | Portal, crear solicitud, seguimiento, confirmar y evaluar |
 | Agente | `camila@andes.demo` | «Tu día», bandeja, SLA en riesgo, notas internas |
 | Aprobadora | `patricia@andes.demo` | Aprobaciones pendientes |
-| Gestor de servicios | `gestor@andes.demo` | Panel ejecutivo, reportes, catálogo, SLA |
+| Gestor de servicios | `gestor@andes.demo` | Panel ejecutivo, reportes, problemas, CAB de cambios, CMDB |
 | Administradora | `admin@andes.demo` | Usuarios, equipos, auditoría, organización |
 | Superadmin SaaS | `root@itsmeasy.app` | Organizaciones (tenants) |
 | Otra empresa | `admin@globex.demo` | Comprueba el aislamiento de datos |
 
 La organización **Andes Logística** incluye 4 equipos de agentes, 8 servicios de catálogo (con aprobaciones y un campo
 cifrado), 7 categorías con clasificación automática, SLA por prioridad con calendario laboral chileno y feriados 2026,
-~116 tickets de 60 días con historial, comentarios, evaluaciones y 10 artículos de ayuda.
+~116 tickets de 60 días con historial, comentarios, evaluaciones y 10 artículos de ayuda. Fase 2: 27 elementos de
+CMDB con dependencias reales (servicios → aplicaciones → servidores/red → proveedores), 4 problemas en distintas etapas
+(incluido un error conocido con plan de acción) y 8 cambios (estándar, normal, emergencia; uno revertido; dos en
+conflicto de calendario; uno esperando al CAB).
 
 ## Pruebas
 ```bash
 npm test               # unitarias: motor SLA (zonas horarias, feriados, pausas), matriz de prioridad, clasificación, RBAC, cifrado
-npm run test:e2e       # funcionales con Playwright contra el servidor en marcha (resiembra antes: npm run db:seed)
+npm run test:e2e       # Fase 1 con Playwright contra el servidor en marcha (resiembra antes: npm run db:seed)
+npm run test:e2e:2     # Fase 2: problemas, cambios con CAB multinivel, CMDB, aprobación multinivel, aislamiento
 ```
 La suite E2E cubre de punta a punta: reporte de incidente con sugerencias, solicitud con aprobación, validaciones,
 RBAC en UI y API, aprobación, tomar/escalar/resolver, transición inválida, reportes y CSV, confirmación con CSAT,
@@ -67,10 +71,11 @@ Errores: `{ error, code, fields? }` con 401/403/404/422/429.
 ## Estructura
 ```
 prisma/            schema, migraciones, seed
-src/lib/           lógica pura y probada: sla-calc, classify, rbac, crypto, labels
-src/server/        dominio: auth, tickets, sla, metrics, admin, notify, audit, api
+src/lib/           lógica pura y probada: sla-calc, classify, itsm (riesgo, impacto, conflictos), rbac, crypto, labels
+src/server/        dominio: auth, tickets, sla, problems, changes, cmdb, metrics, admin, notify, audit, worklog, api
 src/app/(auth)/    login, recuperación de contraseña
-src/app/(app)/     portal, tickets, bandeja, aprobaciones, catálogo, ayuda, reportes, admin, plataforma
+src/app/(app)/     portal, tickets, bandeja, aprobaciones, catálogo, ayuda, reportes, admin, plataforma,
+                   problems, changes (+ calendario), cmdb
 src/app/api/       REST v1, SSE, cron
 src/components/    sistema de diseño (ui, modal, toast, gráficos, búsqueda, notificaciones)
 tests/             unitarias y E2E

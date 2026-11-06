@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { Download, Info } from "lucide-react";
+import { Download } from "lucide-react";
 import { requireCtx } from "@/server/auth";
-import { getMetrics } from "@/server/metrics";
+import { getItsmMetrics, getMetrics } from "@/server/metrics";
+import Link from "next/link";
+import { CHANGE_TYPE_LABEL } from "@/lib/labels";
 import { Badge, Card, CardHeader, PageHeader, Select, Stat, buttonClass } from "@/components/ui";
 import { ComplianceChart, HBarChart, TrendChart } from "@/components/charts";
 import { PRIORITY_LABEL } from "@/lib/labels";
@@ -14,8 +16,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const ctx = await requireCtx("reports:view");
   const sp = await searchParams;
   const clean = Object.fromEntries(Object.entries(sp).filter(([, v]) => v));
-  let m;
-  try { m = await getMetrics(ctx, clean); } catch { m = await getMetrics(ctx, {}); }
+  let m, x;
+  try { [m, x] = await Promise.all([getMetrics(ctx, clean), getItsmMetrics(ctx, clean)]); } catch { [m, x] = await Promise.all([getMetrics(ctx, {}), getItsmMetrics(ctx, {})]); }
   const k = m.kpis;
   const tone = (v: number | null) => (v == null ? undefined : v >= 90 ? "good" : v >= 75 ? "warn" : "bad");
   const exportQs = new URLSearchParams({ ...clean, from: m.range.from, to: m.range.to }).toString();
@@ -69,10 +71,34 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div className="p-5">{m.recurring.length ? <HBarChart label="Incidentes" data={m.recurring.map((r) => ({ name: r.name, value: r.count }))} /> : <p className="text-sm text-muted">Sin incidentes en el período.</p>}</div>
         </Card>
       </div>
-      <Card className="flex items-start gap-3 p-4 text-sm text-muted">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <p><strong className="text-fg">Cambios exitosos y fallidos:</strong> disponible cuando se active el módulo de Gestión de cambios (Fase 2). Los indicadores de esta página se calculan con datos reales de la base de datos.</p>
-      </Card>
+      <h2 className="pt-2 text-lg font-semibold">Problemas, cambios y CMDB</h2>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <Stat label="Cambios implementados" value={x.changes.implemented} sub={`${x.changes.planned} en el período`} />
+        <Stat label="Tasa de éxito" value={x.changes.successRate != null ? `${x.changes.successRate}%` : "—"} tone={tone(x.changes.successRate)} />
+        <Stat label="Cambios exitosos" value={x.changes.successful} tone={x.changes.successful ? "good" : undefined} />
+        <Stat label="Fallidos o revertidos" value={x.changes.failed} tone={x.changes.failed ? "bad" : undefined} sub={x.changes.partial ? `${x.changes.partial} parciales` : undefined} />
+        <Stat label="Cambios de emergencia" value={x.changes.emergency} tone={x.changes.emergency > 2 ? "warn" : undefined} />
+        <Stat label="Problemas abiertos" value={x.problems.open} />
+        <Stat label="Errores conocidos" value={x.problems.knownErrors} />
+        <Stat label="Problemas resueltos" value={x.problems.resolved} />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card>
+          <CardHeader title="Cambios por tipo" />
+          <div className="p-5"><HBarChart label="Cambios" data={x.changes.byType.map((t) => ({ name: CHANGE_TYPE_LABEL[t.type]!, value: t.count }))} /></div>
+        </Card>
+        <Card>
+          <CardHeader title="Activos con más incidentes" description="Candidatos a investigar como problema" />
+          {x.topCIs.length ? <ul className="divide-y divide-border">{x.topCIs.map((c) => <li key={c.id}><Link href={`/cmdb/${c.id}`} className="flex justify-between px-5 py-2.5 text-sm hover:bg-subtle"><span>{c.name}</span><span className="font-medium tabular-nums">{c.count}</span></Link></li>)}</ul> : <p className="px-5 py-4 text-sm text-muted">Ningún incidente tiene un elemento de la CMDB asociado en el período.</p>}
+        </Card>
+        <Card>
+          <CardHeader title="Resolución por prioridad" />
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted"><tr className="border-b border-border"><th className="px-5 py-2 text-left font-medium">Prioridad</th><th className="px-3 text-right font-medium">Resueltos</th><th className="px-3 text-right font-medium">MTTR</th><th className="px-5 text-right font-medium">SLA</th></tr></thead>
+            <tbody>{x.mttrByPriority.map((r) => <tr key={r.priority} className="border-b border-border last:border-0"><td className="px-5 py-2">{r.priority} · {PRIORITY_LABEL[r.priority]}</td><td className="px-3 text-right tabular-nums">{r.count}</td><td className="px-3 text-right tabular-nums">{formatMinutes(r.mttr)}</td><td className="px-5 text-right tabular-nums">{r.sla != null ? `${r.sla}%` : "—"}</td></tr>)}</tbody>
+          </table>
+        </Card>
+      </div>
     </div>
   );
 }

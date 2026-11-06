@@ -53,6 +53,8 @@ export const updateInput = z.object({
   impact: level.optional(),
   urgency: level.optional(),
   categoryId: z.string().optional().nullable(),
+  configItemId: z.string().optional().nullable(),
+  problemId: z.string().optional().nullable(),
   resolution: z.string().trim().max(5000).optional().nullable(),
 });
 
@@ -386,6 +388,9 @@ export async function getTicket(ctx: Ctx, id: string) {
       },
       activities: { include: { actor: { select: { name: true } } }, orderBy: { createdAt: "asc" } },
       approvals: { include: { approver: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } },
+      problem: { select: { id: true, number: true, title: true, status: true, workaround: true } },
+      configItem: { select: { id: true, name: true, type: true } },
+      linkedArticles: { select: { id: true, slug: true, title: true } },
     },
   });
   if (!t) throw notFound();
@@ -480,6 +485,24 @@ export async function updateTicket(ctx: Ctx, id: string, raw: unknown) {
       acts.push({ action: "category", to: c.name });
     }
     data.categoryId = input.categoryId;
+  }
+
+  // Elemento de configuración afectado (CMDB) y problema vinculado
+  if (input.configItemId !== undefined && input.configItemId !== t.configItemId) {
+    if (input.configItemId) {
+      const ci = await db.configItem.findFirst({ where: { id: input.configItemId, orgId: ctx.orgId } });
+      if (!ci) throw invalid("Elemento de configuración inválido.");
+      acts.push({ action: "ci", to: ci.name });
+    }
+    data.configItemId = input.configItemId;
+  }
+  if (input.problemId !== undefined && input.problemId !== t.problemId) {
+    if (input.problemId) {
+      const pr = await db.problem.findFirst({ where: { id: input.problemId, orgId: ctx.orgId } });
+      if (!pr) throw invalid("Problema inválido.");
+      acts.push({ action: "problem", to: `PRB-${pr.number}` });
+    }
+    data.problemId = input.problemId;
   }
 
   // Estado
@@ -655,6 +678,22 @@ export async function decideApproval(ctx: Ctx, approvalId: string, raw: unknown)
   const t = ap.ticket;
   const now = new Date();
   const ref = ticketRef(t.type, t.number);
+  // Aprobación multinivel: si el servicio define un segundo aprobador, el nivel 1 abre el nivel 2
+  if (input.approve && ap.level === 1 && t.serviceItemId) {
+    const svc = await db.serviceItem.findUnique({ where: { id: t.serviceItemId }, select: { secondApproverId: true, name: true } });
+    const second = svc?.secondApproverId;
+    if (second && second !== ap.approverId && second !== t.requesterId) {
+      await db.$transaction(async (tx) => {
+        await tx.approval.update({ where: { id: ap.id }, data: { status: "APPROVED", comment: input.comment, decidedAt: now } });
+        await tx.approval.create({ data: { ticketId: t.id, approverId: second, level: 2 } });
+        await activity(tx, t.id, ctx.user.id, "approval", "PENDING", "APPROVED", `Nivel 1 aprobado${input.comment ? `: ${input.comment}` : ""}. Pasa a segundo nivel.`);
+      });
+      await notify(ctx.orgId, [second], { kind: "warning", title: `Aprobación pendiente (nivel 2): ${ref}`, body: svc!.name, link: "/approvals" });
+      await notify(ctx.orgId, [t.requesterId], { kind: "info", title: `Tu solicitud ${ref} pasó el primer nivel de aprobación`, body: "Ahora espera la aprobación final.", link: `/tickets/${t.id}` });
+      await audit({ orgId: ctx.orgId, actor: ctx.user, action: "approval.approved", entity: "ticket", entityId: t.id, meta: { level: 1 } });
+      return;
+    }
+  }
   if (input.approve) {
     const resume = await resumeSlaData(t);
     const assigneeId = await pickAssignee(ctx.orgId, t.teamId);
@@ -679,4 +718,16 @@ export async function decideApproval(ctx: Ctx, approvalId: string, raw: unknown)
     await notify(ctx.orgId, [t.requesterId], { kind: "danger", title: `Tu solicitud ${ref} no fue aprobada`, body: input.comment, link: `/tickets/${t.id}` });
   }
   await audit({ orgId: ctx.orgId, actor: ctx.user, action: input.approve ? "approval.approved" : "approval.rejected", entity: "ticket", entityId: t.id });
+}
+
+/** Relación conocimiento ↔ ticket: el agente vincula el artículo que usó (o lo desvincula). */
+export async function linkArticle(ctx: Ctx, ticketId: string, articleId: string, link: boolean) {
+  if (!isStaff(ctx)) throw forbidden();
+  const t = await loadVisibleTicket(ctx, ticketId);
+  const a = await db.kbArticle.findFirst({ where: { id: articleId, orgId: ctx.orgId } });
+  if (!a) throw notFound("Artículo no encontrado.");
+  await db.$transaction(async (tx) => {
+    await tx.ticket.update({ where: { id: t.id }, data: { linkedArticles: link ? { connect: { id: a.id } } : { disconnect: { id: a.id } } } });
+    await activity(tx, t.id, ctx.user.id, "article", null, link ? a.title : null, link ? undefined : `Desvinculado: ${a.title}`);
+  });
 }

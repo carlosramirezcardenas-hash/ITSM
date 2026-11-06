@@ -179,6 +179,7 @@ export const serviceInput = z.object({
   requiresApproval: z.boolean().default(false),
   approvalMode: z.enum(["MANAGER", "USER"]).default("MANAGER"),
   approverId: optId,
+  secondApproverId: optId,
   ownerTeamId: optId,
   ownerId: optId,
   defaultPriority: z.enum(["P1", "P2", "P3", "P4"]).default("P3"),
@@ -197,9 +198,10 @@ export async function saveService(ctx: Ctx, serviceId: string | null, raw: unkno
     [input.ownerTeamId, () => db.team.findFirst({ where: { id: input.ownerTeamId!, orgId: ctx.orgId } })],
     [input.ownerId, () => db.user.findFirst({ where: { id: input.ownerId!, orgId: ctx.orgId } })],
     [input.approverId, () => db.user.findFirst({ where: { id: input.approverId!, orgId: ctx.orgId } })],
+    [input.secondApproverId, () => db.user.findFirst({ where: { id: input.secondApproverId!, orgId: ctx.orgId } })],
   ];
   for (const [v, check] of checks) if (v && !(await check())) throw invalid("Referencia inválida en el formulario.");
-  const data = { ...input, requirements: input.requirements || null, formSchema: input.formSchema };
+  const data = { ...input, requirements: input.requirements || null, formSchema: input.formSchema, secondApproverId: input.requiresApproval ? input.secondApproverId : null };
   let s;
   if (serviceId) {
     if (!(await db.serviceItem.findFirst({ where: { id: serviceId, orgId: ctx.orgId } }))) throw notFound();

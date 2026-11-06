@@ -181,14 +181,37 @@ respuesta/resolución, escala y cierra resueltos antiguos.
 Autenticación (login, cierre de sesión, recuperación y cambio de contraseña, sesiones revocables), multi-tenancy,
 usuarios/roles/departamentos/equipos, portal de autoservicio, incidentes, solicitudes con aprobaciones, catálogo
 configurable, SLA (políticas, calendarios, feriados, pausas, alertas, escalamientos), dashboards por rol, reportes con
-filtros y CSV, búsqueda global, notificaciones en tiempo real, auditoría, plataforma SaaS (crear/suspender organizaciones).
+filtros y CSV, búsqueda global, notificaciones en tiempo real, auditoría, plataforma SaaS (crear/suspender organizaciones),
+base de conocimientos.
 
-Adelantado de Fase 2 porque el portal lo requiere: **base de conocimientos** (CRUD, categorías, etiquetas, FAQ, pasos,
-valoración, sugerencias al reportar) y **flujos de aprobación** de catálogo.
+### Fase 2 — ITSM avanzado ✅ implementada y probada
+- **Gestión de problemas** (`/problems`): registro manual, desde un incidente o desde la detección automática de
+  categorías con incidentes repetidos; vínculo con incidentes; análisis de causa raíz (5 porqués, Ishikawa, línea de
+  tiempo); **errores conocidos** (exigen causa raíz y solución temporal); publicación de la solución temporal como
+  artículo; plan de acción con responsables y fechas (no se cierra con acciones pendientes); resolución en bloque de los
+  incidentes vinculados con aviso a cada usuario; cambios relacionados; bitácora.
+  Estados: Nuevo → En análisis → Error conocido → Resuelto → Cerrado.
+- **Gestión de cambios** (`/changes`): tipos estándar (preaprobado), normal (CAB) y emergencia (ECAB); evaluación de riesgo
+  con cuestionario + servicios críticos afectados según la CMDB; impacto calculado; **aprobación multinivel**
+  (CAB y, si el riesgo es alto, dirección); plan de implementación, de reversa y de pruebas (obligatorios para enviar);
+  **calendario** mensual con **detección de conflictos** (misma ventana + mismo elemento); implementación con resultado
+  (exitoso, parcial, fallido, revertido) y **revisión post-implementación** obligatoria. El plan queda congelado tras la aprobación.
+  Estados: Borrador → Evaluación → Esperando CAB → Programado → En implementación → Revisión → Cerrado (o Rechazado/Cancelado).
+- **CMDB simplificada** (`/cmdb`): equipos, servidores, aplicaciones, bases de datos, red, licencias (uso y vencimiento),
+  servicios tecnológicos y proveedores; relaciones (depende de, se ejecuta en, usa, es provisto por, se conecta a);
+  **análisis de impacto transitivo** («si esto falla, ¿qué servicios se afectan?», tolerante a ciclos); historial de
+  tickets, problemas y cambios por elemento; alertas de vencimiento.
+- **Integración con incidentes**: elemento afectado, problema vinculado, errores conocidos sugeridos al agente y
+  solución temporal visible para el usuario; **relación conocimiento ↔ ticket** (artículos usados).
+- **Aprobación multinivel en el catálogo**: segundo aprobador opcional por servicio (p. ej. jefatura → TI).
+- **Reportes avanzados**: tasa de éxito de cambios, fallidos/revertidos, emergencias, cambios por tipo, problemas y
+  errores conocidos, activos con más incidentes, MTTR y SLA por prioridad.
+
+Permisos nuevos: `problems:manage` (agentes, gestores, admin), `changes:create` (ídem), `changes:approve` (CAB:
+gestores y admin), `cmdb:view` (agentes) y `cmdb:manage` (gestores y admin). Lógica pura y probada en `src/lib/itsm.ts`.
 
 ### Aún NO implementado (sin botones ni pantallas falsas)
-- **Fase 2**: gestión de problemas, gestión de cambios (por eso «cambios exitosos/fallidos» aparece como no disponible
-  en reportes), CMDB, relación artículo↔ticket explícita, aprobaciones multinivel.
 - **Fase 3**: asistente IA (resúmenes, respuestas sugeridas, causa raíz), automatizaciones configurables por el usuario,
   análisis predictivo, correo electrónico (los enlaces de recuperación se muestran en pantalla solo en `DEMO_MODE`),
-  Microsoft Teams, SSO, API keys para integraciones, adjuntos de archivos.
+  Microsoft Teams, SSO, API keys e importación/descubrimiento automático de la CMDB, adjuntos de archivos.
+- Fuera de alcance por ahora: congelamientos de cambios (*freeze windows*), CAB con votación por mayoría, diagrama gráfico de la CMDB.

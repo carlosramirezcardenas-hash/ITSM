@@ -25,7 +25,7 @@ export default async function AdminCatalog() {
                 <td className="px-3 text-muted">{s.category?.name ?? "—"}</td>
                 <td className="px-3 text-muted">{s.ownerTeam?.name ?? "—"}</td>
                 <td className="px-3 text-muted">{s.estimatedHours} h</td>
-                <td className="px-3">{s.requiresApproval ? <Badge tone="amber"><ShieldCheck className="h-3 w-3" />{s.approvalMode === "MANAGER" ? "Jefatura" : "Aprobador fijo"}</Badge> : <span className="text-muted">No</span>}</td>
+                <td className="px-3">{s.requiresApproval ? <Badge tone="amber"><ShieldCheck className="h-3 w-3" />{s.approvalMode === "MANAGER" ? "Jefatura" : "Aprobador fijo"}{s.secondApproverId ? " + 2.º nivel" : ""}</Badge> : <span className="text-muted">No</span>}</td>
                 <td className="px-3 text-right tabular-nums">{s._count.tickets}</td>
                 <td className="px-5 text-right"><Link href={`/admin/catalog/${s.id}`} className={buttonClass("ghost", "sm")}>Editar</Link></td>
               </tr>

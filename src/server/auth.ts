@@ -49,6 +49,11 @@ async function clientInfo() {
 
 // Limitador simple en memoria por IP (en producción: Redis).
 const attempts = new Map<string, { count: number; reset: number }>();
+/** Falla si la clave ya superó el máximo, sin sumar un intento. */
+function checkLimit(key: string, max: number) {
+  const e = attempts.get(key);
+  if (e && e.reset > Date.now() && e.count >= max) throw new AppError("RATE_LIMIT", "Demasiados intentos. Espera unos minutos.");
+}
 function rateLimit(key: string, max = 20, windowMs = 10 * 60 * 1000) {
   const now = Date.now();
   const entry = attempts.get(key);
@@ -64,11 +69,15 @@ let dummyHash: string | undefined;
 
 export async function login(email: string, password: string) {
   const { ip, userAgent } = await clientInfo();
-  rateLimit(`login:${ip}`, 100); // oficinas detrás de una misma IP
-  rateLimit(`login:${ip}:${email.toLowerCase().trim()}`, 10);
+  const ipKey = `login-fail-ip:${ip}`;
+  checkLimit(ipKey, 50); // oficinas detrás de una misma IP: solo cuentan los fallidos
+  const failKey = `login-fail:${ip}:${email.toLowerCase().trim()}`;
+  checkLimit(failKey, 10); // solo cuentan los intentos fallidos
   const user = await db.user.findUnique({ where: { email: email.toLowerCase().trim() }, include: { org: true } });
   const generic = new AppError("UNAUTHORIZED", "Correo o contraseña incorrectos.");
   if (!user) {
+    rateLimit(failKey, 1000);
+    rateLimit(ipKey, 1000);
     dummyHash ??= await bcrypt.hash("dummy-password", 12);
     await bcrypt.compare(password, dummyHash); // tiempo constante: no revela si el correo existe
     throw generic;
@@ -85,8 +94,11 @@ export async function login(email: string, password: string) {
       data: { failedLogins: failed >= MAX_FAILED ? 0 : failed, lockedUntil: failed >= MAX_FAILED ? new Date(Date.now() + LOCK_MS) : null },
     });
     await audit({ orgId: user.orgId, actor: user, action: "auth.login_failed", entity: "user", entityId: user.id, ip });
+    rateLimit(failKey, 1000);
+    rateLimit(ipKey, 1000);
     throw generic;
   }
+  attempts.delete(failKey);
   const token = randomToken();
   const session = await db.session.create({
     data: { tokenHash: sha256(token), userId: user.id, ip, userAgent, expiresAt: new Date(Date.now() + SESSION_TTL_MS) },

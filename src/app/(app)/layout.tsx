@@ -13,9 +13,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   } else {
     const r = user.role;
     const staff = can(r, "tickets:work");
-    const [pendingApprovals, myOpen] = await Promise.all([
+    const [pendingApprovals, myOpen, pendingChanges] = await Promise.all([
       can(r, "approvals:decide") ? db.approval.count({ where: { approverId: user.id, status: "PENDING", ticket: { orgId: user.orgId! } } }) : 0,
       staff ? db.ticket.count({ where: { orgId: user.orgId!, assigneeId: user.id, status: { in: ["NEW", "ASSIGNED", "IN_PROGRESS", "PENDING"] } } }) : 0,
+      can(r, "changes:approve") ? db.changeApproval.count({ where: { approverId: user.id, status: "PENDING", change: { orgId: user.orgId!, status: "PENDING_APPROVAL" } } }) : 0,
     ]);
     sections.push({
       items: [
@@ -28,7 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         { href: "/help", label: "Centro de ayuda", icon: "book" },
       ],
     });
-    if (can(r, "reports:view")) sections.push({ title: "Gestión", items: [{ href: "/reports", label: "Dashboard y reportes", icon: "chart" }] });
+    const mgmt: NavSection = { title: "Gestión ITSM", items: [] };
+    if (can(r, "problems:manage")) mgmt.items.push({ href: "/problems", label: "Problemas", icon: "bug" });
+    if (can(r, "changes:create")) mgmt.items.push({ href: "/changes", label: "Cambios", icon: "change", badge: pendingChanges });
+    if (can(r, "cmdb:view")) mgmt.items.push({ href: "/cmdb", label: "CMDB", icon: "cmdb" });
+    if (can(r, "reports:view")) mgmt.items.push({ href: "/reports", label: "Dashboard y reportes", icon: "chart" });
+    if (mgmt.items.length) sections.push(mgmt);
     const admin: NavSection = { title: "Administración", items: [] };
     if (can(r, "users:manage")) admin.items.push({ href: "/admin/users", label: "Usuarios", icon: "users" });
     if (can(r, "teams:manage")) admin.items.push({ href: "/admin/teams", label: "Equipos", icon: "teams" });

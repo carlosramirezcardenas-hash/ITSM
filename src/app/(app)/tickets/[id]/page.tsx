@@ -12,6 +12,8 @@ import { PriorityBadge, SlaBadge, StatusBadge } from "@/components/ticket-bits";
 import { APPROVAL_LABEL, LEVEL_LABEL, PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL, TYPE_USER_LABEL } from "@/lib/labels";
 import { cn, formatDateTime, ticketRef, timeAgo } from "@/lib/utils";
 import { Composer, ConfirmResolution, StaffPanel } from "./ticket-client";
+import { ItsmPanel } from "./itsm-panel";
+import { knownErrorsFor } from "@/server/problems";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Detalle" };
@@ -27,6 +29,12 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const org = await db.organization.findUnique({ where: { id: ctx.orgId }, select: { timezone: true } });
   const tz = org?.timezone;
 
+  const itsm = staff ? await Promise.all([
+    db.configItem.findMany({ where: { orgId: ctx.orgId, status: { not: "RETIRED" } }, select: { id: true, name: true, type: true }, orderBy: { name: "asc" } }),
+    db.problem.findMany({ where: { orgId: ctx.orgId, status: { not: "CLOSED" } }, select: { id: true, number: true, title: true }, orderBy: { number: "desc" } }),
+    db.kbArticle.findMany({ where: { orgId: ctx.orgId, status: "PUBLISHED" }, select: { id: true, title: true }, orderBy: { title: "asc" } }),
+    knownErrorsFor(ctx, { categoryId: t.categoryId, configItemId: t.configItemId }),
+  ]) : null;
   const [teams, agents, categories, similar] = staff ? await Promise.all([
     db.team.findMany({ where: { orgId: ctx.orgId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.user.findMany({ where: { orgId: ctx.orgId, isActive: true, role: { in: ["AGENT", "SERVICE_MANAGER", "ORG_ADMIN"] } }, select: { id: true, name: true, memberships: { select: { teamId: true } } }, orderBy: { name: "asc" } }),
@@ -181,6 +189,16 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
               agents={agents.map((a) => ({ id: a.id, name: a.name, teamIds: a.memberships.map((m) => m.teamId) }))} me={ctx.user.id}
             />
           ) : null}
+          {staff && itsm && (
+            <ItsmPanel ticketId={t.id} closed={t.status === "CLOSED"} isIncident={t.type === "INCIDENT"} configItem={t.configItem} problem={t.problem}
+              articles={t.linkedArticles} knownErrors={itsm[3]} cis={itsm[0]} problems={itsm[1]} allArticles={itsm[2]} />
+          )}
+          {!staff && t.problem?.status === "KNOWN_ERROR" && t.problem.workaround && !["RESOLVED", "CLOSED"].includes(t.status) && (
+            <Card className="border-amber-200 p-4 text-sm dark:border-amber-900">
+              <p className="font-medium">Mientras lo solucionamos, puedes probar esto:</p>
+              <p className="mt-1 whitespace-pre-wrap text-muted">{t.problem.workaround}</p>
+            </Card>
+          )}
           <Card className="space-y-3 p-4 text-sm">
             <Row label="Responsable">{t.assignee ? <span className="flex items-center gap-1.5"><Avatar name={t.assignee.name} size={20} />{t.assignee.name}</span> : <span className="text-muted">Por asignar</span>}</Row>
             <Row label="Equipo">{t.team?.name ?? "—"}</Row>
@@ -230,6 +248,9 @@ function describe(a: { action: string; fromValue: string | null; toValue: string
     case "category": return `cambió la categoría a «${a.toValue}»`;
     case "csat": return `evaluó la atención con ${a.toValue}/5`;
     case "sla": return a.note ?? "alerta de SLA";
+    case "ci": return `indicó el elemento afectado «${a.toValue}»`;
+    case "problem": return a.toValue ? `vinculó al problema ${a.toValue}` : "desvinculó el problema";
+    case "article": return a.toValue ? `vinculó el artículo «${a.toValue}»` : (a.note ?? "desvinculó un artículo");
     default: return a.action;
   }
 }

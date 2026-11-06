@@ -19,6 +19,9 @@ export const GET = api(async (req: Request) => {
     ...(staff ? [{ title: "Bandeja de trabajo", href: "/queue", k: "bandeja cola tickets incidentes" }] : []),
     ...(can(ctx.user.role, "reports:view") ? [{ title: "Dashboard y reportes", href: "/reports", k: "reportes dashboard indicadores sla" }] : []),
     ...(can(ctx.user.role, "approvals:decide") ? [{ title: "Aprobaciones", href: "/approvals", k: "aprobar aprobaciones" }] : []),
+    ...(can(ctx.user.role, "problems:manage") ? [{ title: "Problemas", href: "/problems", k: "problemas causa raiz error conocido" }] : []),
+    ...(can(ctx.user.role, "changes:create") ? [{ title: "Cambios", href: "/changes", k: "cambios cab calendario" }, { title: "Calendario de cambios", href: "/changes/calendar", k: "calendario ventanas" }] : []),
+    ...(can(ctx.user.role, "cmdb:view") ? [{ title: "CMDB", href: "/cmdb", k: "cmdb activos inventario servidores" }] : []),
   ];
   const ql = q.toLowerCase();
   const results: { kind: string; title: string; subtitle?: string; href: string }[] = [];
@@ -48,6 +51,20 @@ export const GET = api(async (req: Request) => {
     select: { id: true, name: true, description: true }, take: 5,
   });
   for (const s of services) results.push({ kind: "service", title: s.name, subtitle: s.description, href: `/catalog/${s.id}` });
+  if (can(ctx.user.role, "problems:manage")) {
+    const pn = Number(q.replace(/^prb-?/i, ""));
+    const probs = await db.problem.findMany({ where: { orgId: ctx.orgId, OR: [{ title: { contains: q, mode: "insensitive" } }, ...(Number.isInteger(pn) && pn > 0 ? [{ number: pn }] : [])] }, select: { id: true, number: true, title: true }, take: 4 });
+    for (const p of probs) results.push({ kind: "ticket", title: `PRB-${p.number} · ${p.title}`, subtitle: "Problema", href: `/problems/${p.id}` });
+  }
+  if (can(ctx.user.role, "changes:create")) {
+    const cn = Number(q.replace(/^chg-?/i, ""));
+    const chs = await db.change.findMany({ where: { orgId: ctx.orgId, OR: [{ title: { contains: q, mode: "insensitive" } }, ...(Number.isInteger(cn) && cn > 0 ? [{ number: cn }] : [])] }, select: { id: true, number: true, title: true }, take: 4 });
+    for (const c of chs) results.push({ kind: "ticket", title: `CHG-${c.number} · ${c.title}`, subtitle: "Cambio", href: `/changes/${c.id}` });
+  }
+  if (can(ctx.user.role, "cmdb:view")) {
+    const cis = await db.configItem.findMany({ where: { orgId: ctx.orgId, OR: [{ name: { contains: q, mode: "insensitive" } }, { ipAddress: { contains: q } }, { serial: { contains: q, mode: "insensitive" } }] }, select: { id: true, name: true, type: true }, take: 4 });
+    for (const c of cis) results.push({ kind: "service", title: c.name, subtitle: "Elemento de la CMDB", href: `/cmdb/${c.id}` });
+  }
   for (const p of pages) if (p.title.toLowerCase().includes(ql) || p.k.includes(ql)) results.push({ kind: "page", title: p.title, href: p.href });
   return { results };
 });
