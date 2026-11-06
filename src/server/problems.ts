@@ -12,6 +12,7 @@ import { invalid, notFound } from "./errors";
 import { notify, teamMemberIds } from "./notify";
 import { log } from "./worklog";
 import { audit } from "./audit";
+import { after } from "next/server";
 
 
 const level = z.enum(["LOW", "MEDIUM", "HIGH"]);
@@ -159,6 +160,7 @@ export async function updateProblem(ctx: Ctx, id: string, raw: unknown) {
     await notify(ctx.orgId, [input.ownerId], { title: `Eres responsable del problema PRB-${p.number}`, body: p.title, link: `/problems/${id}` });
   }
   if (status === "KNOWN_ERROR") {
+    after(async () => { const { dispatch } = await import("./integrations"); await dispatch(ctx.orgId, "problem.known_error", { title: `PRB-${p.number} · ${p.title}`, text: "Hay una solución temporal disponible.", link: `/problems/${id}` }).catch(() => {}); });
     await notify(ctx.orgId, await teamMemberIds(p.teamId), { kind: "info", title: `Error conocido PRB-${p.number}: hay solución temporal`, body: p.title, link: `/problems/${id}` }, ctx.user.id);
   }
 }

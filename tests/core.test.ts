@@ -139,3 +139,52 @@ test("Calendario: conflicto solo si se superponen y comparten CI", () => {
   assert.equal(findConflicts(a, [{ id: "c", start: d(2), end: d(4), ciIds: ["x"] }]).length, 0);
   assert.equal(findConflicts(a, [{ id: "e", start: d(3), end: d(5), ciIds: ["db"] }]).length, 0, "ventanas contiguas no chocan");
 });
+
+// ===================== Fase 3 =====================
+import { ruleMatches, validateRule } from "../src/lib/automation";
+import { breachRisk, forecastDaily } from "../src/lib/predict";
+
+const facts = { type: "INCIDENT", priority: "P2", impact: "HIGH", urgency: "MEDIUM", categoryId: "net", teamId: "infra", channel: "portal", title: "Caída del WMS en bodega", description: "Nadie puede despachar", requesterDepartment: "Operaciones" };
+
+test("Automatizaciones: condiciones AND con operadores", () => {
+  assert.ok(ruleMatches([{ field: "type", op: "eq", value: "INCIDENT" }, { field: "text", op: "contains", value: "wms" }], facts));
+  assert.ok(ruleMatches([{ field: "priority", op: "in", value: ["P1", "P2"] }], facts));
+  assert.ok(!ruleMatches([{ field: "priority", op: "in", value: ["P1"] }], facts));
+  assert.ok(ruleMatches([{ field: "text", op: "not_contains", value: "impresora" }], facts));
+  assert.ok(ruleMatches([], facts), "sin condiciones aplica a todo");
+  assert.ok(!ruleMatches([{ field: "requesterDepartment", op: "neq", value: "Operaciones" }], facts));
+});
+
+test("Automatizaciones: validación de reglas", () => {
+  assert.equal(validateRule([], [{ type: "notify_managers" }]), null);
+  assert.match(validateRule([], [])!, /al menos una acción/);
+  assert.match(validateRule([{ field: "priority", op: "contains", value: "P1" }], [{ type: "escalate" }])!, /Operador no válido/);
+  assert.match(validateRule([], [{ type: "set_priority", value: "P9" }])!, /Prioridad inválida/);
+  assert.match(validateRule([], [{ type: "assign_team" }])!, /Completa el valor/);
+});
+
+test("Predicción: pronóstico semanal con estacionalidad y tendencia", () => {
+  const today = new Date(Date.UTC(2026, 10, 6)); // viernes
+  const history: { date: string; count: number }[] = [];
+  for (let i = 1; i <= 35; i++) {
+    const d = new Date(today.getTime() - i * 86400_000);
+    history.push({ date: d.toISOString().slice(0, 10), count: [0, 6].includes(d.getUTCDay()) ? 1 : 10 });
+  }
+  const { trend, forecast } = forecastDaily(history, 7, today);
+  assert.equal(trend, 1);
+  assert.equal(forecast.length, 7);
+  const sat = forecast.find((f) => f.weekday === 6)!;
+  const mon = forecast.find((f) => f.weekday === 1)!;
+  assert.equal(sat.expected, 1);
+  assert.equal(mon.expected, 10);
+});
+
+test("Predicción: riesgo de incumplimiento de SLA", () => {
+  const now = new Date(Date.UTC(2026, 10, 6, 12));
+  const base = { createdAt: new Date(now.getTime() - 8 * 3600_000), resolutionDueAt: new Date(now.getTime() + 2 * 3600_000), slaPausedAt: null, status: "IN_PROGRESS", priority: "P2", assigneeId: "a", assigneeOpenLoad: 3, reopenCount: 0 };
+  assert.equal(breachRisk(base, now).level, "medium");
+  assert.equal(breachRisk({ ...base, assigneeId: null, status: "NEW" }, now).level, "high");
+  assert.equal(breachRisk({ ...base, slaPausedAt: now }, now).level, "paused");
+  assert.equal(breachRisk({ ...base, resolutionDueAt: new Date(now.getTime() - 1) }, now).score, 100);
+  assert.equal(breachRisk({ ...base, createdAt: new Date(now.getTime() - 60_000), resolutionDueAt: new Date(now.getTime() + 600 * 60_000) }, now).level, "low");
+});

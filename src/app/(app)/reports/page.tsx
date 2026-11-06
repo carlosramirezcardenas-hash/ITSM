@@ -5,7 +5,11 @@ import { getItsmMetrics, getMetrics } from "@/server/metrics";
 import Link from "next/link";
 import { CHANGE_TYPE_LABEL } from "@/lib/labels";
 import { Badge, Card, CardHeader, PageHeader, Select, Stat, buttonClass } from "@/components/ui";
-import { ComplianceChart, HBarChart, TrendChart } from "@/components/charts";
+import { ComplianceChart, ForecastChart, HBarChart, TrendChart } from "@/components/charts";
+import { riskRanking, ticketForecast } from "@/server/predictive";
+import { aiAvailable } from "@/server/ai";
+import { AiTrends } from "./ai-trends";
+import { RiskList } from "@/components/risk-list";
 import { PRIORITY_LABEL } from "@/lib/labels";
 import { formatMinutes } from "@/lib/utils";
 
@@ -20,6 +24,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   try { [m, x] = await Promise.all([getMetrics(ctx, clean), getItsmMetrics(ctx, clean)]); } catch { [m, x] = await Promise.all([getMetrics(ctx, {}), getItsmMetrics(ctx, {})]); }
   const k = m.kpis;
   const tone = (v: number | null) => (v == null ? undefined : v >= 90 ? "good" : v >= 75 ? "warn" : "bad");
+  const [fc, risk, aiOn] = await Promise.all([ticketForecast(ctx), riskRanking(ctx, { take: 8 }), aiAvailable(ctx.orgId)]);
+  const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
   const exportQs = new URLSearchParams({ ...clean, from: m.range.from, to: m.range.to }).toString();
   return (
     <div className="space-y-6">
@@ -71,6 +77,25 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div className="p-5">{m.recurring.length ? <HBarChart label="Incidentes" data={m.recurring.map((r) => ({ name: r.name, value: r.count }))} /> : <p className="text-sm text-muted">Sin incidentes en el período.</p>}</div>
         </Card>
       </div>
+      <h2 className="pt-2 text-lg font-semibold">Análisis predictivo</h2>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="Pronóstico de tickets · próximos 7 días" description={`≈${fc.total} tickets esperados · tendencia ${fc.trend > 1.05 ? "al alza" : fc.trend < 0.95 ? "a la baja" : "estable"} (${Math.round((fc.trend - 1) * 100)}%)`} />
+          <div className="p-5">
+            <ForecastChart data={fc.forecast.map((f) => ({ label: `${DOW[f.weekday]} ${f.date.slice(8)}`, expected: f.expected, low: f.low, high: f.high }))} />
+            <p className="mt-3 text-xs text-muted">
+              Modelo: promedio del mismo día de la semana en las últimas 4 semanas × tendencia de los últimos 14 días.
+              {fc.capacity > 0 && <> Pico esperado: <strong className="text-fg">≈{fc.peak}</strong> tickets en un día; el máximo resuelto en un día del último mes fue <strong className="text-fg">{fc.capacity}</strong>.{fc.overCapacity ? <span className="font-medium text-amber-600"> El volumen esperado supera la capacidad observada: considera reforzar el equipo.</span> : " La capacidad observada alcanza."}</>}
+            </p>
+          </div>
+        </Card>
+        <Card>
+          <CardHeader title="Riesgo de incumplir el SLA" description="Tickets abiertos con mayor probabilidad de vencer" />
+          <RiskList items={risk} />
+        </Card>
+      </div>
+      <AiTrends filters={clean as Record<string, string>} aiOn={aiOn} />
+
       <h2 className="pt-2 text-lg font-semibold">Problemas, cambios y CMDB</h2>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         <Stat label="Cambios implementados" value={x.changes.implemented} sub={`${x.changes.planned} en el período`} />

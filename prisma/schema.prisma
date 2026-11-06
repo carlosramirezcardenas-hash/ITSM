@@ -66,6 +66,7 @@ model Organization {
   plan       String   @default("starter")
   timezone   String   @default("America/Santiago")
   ticketSeq  Int      @default(1000)
+  aiEnabled  Boolean  @default(true)
   problemSeq Int      @default(100)
   changeSeq  Int      @default(100)
   isActive   Boolean  @default(true)
@@ -87,6 +88,10 @@ model Organization {
   changes       Change[]
   configItems   ConfigItem[]
   workLogs      WorkLog[]
+  aiUsage       AiUsage[]
+  automations   AutomationRule[]
+  integrations  Integration[]
+  apiKeys       ApiKey[]
 }
 
 model User {
@@ -132,6 +137,7 @@ model User {
   ciOwned          ConfigItem[]
   workLogs         WorkLog[]
   secondApproverServices ServiceItem[] @relation("ServiceSecondApprover")
+  apiKeys          ApiKey[]
 
   @@index([orgId, role])
 }
@@ -345,6 +351,9 @@ model Ticket {
   csatComment     String?
   problemId       String?
   problem         Problem?       @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  aiSuggestion    Json?          // sugerencia de triage de la IA (no se aplica sola salvo categoría con alta confianza)
+  aiSummary       String?
+  aiSummaryAt     DateTime?
   configItemId    String?
   configItem      ConfigItem?    @relation(fields: [configItemId], references: [id], onDelete: SetNull)
   createdAt       DateTime       @default(now())
@@ -705,4 +714,92 @@ model WorkLog {
 model JobLock {
   name      String   @id
   lastRunAt DateTime
+}
+
+// =====================================================================
+// FASE 3 — IA, automatizaciones, integraciones
+// =====================================================================
+
+// Registro de uso de IA: transparencia y control de costos por organización
+model AiUsage {
+  id           String   @id @default(cuid())
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId       String?
+  feature      String   // triage | summary | reply | rca | trends | selfhelp
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  ms           Int      @default(0)
+  ok           Boolean  @default(true)
+  error        String?
+  createdAt    DateTime @default(now())
+
+  @@index([orgId, createdAt])
+}
+
+model AutomationRule {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  trigger     String   // ticket.created | ticket.reopened | sla.warning | sla.breached
+  conditions  Json     @default("[]") // [{ field, op, value }]
+  actions     Json     @default("[]") // [{ type, value }]
+  isActive    Boolean  @default(true)
+  position    Int      @default(0)
+  runCount    Int      @default(0)
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orgId, trigger, isActive])
+}
+
+model Integration {
+  id             String   @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  type           String   // teams | slack | webhook
+  name           String
+  configEnc      String   // JSON cifrado (URL, secreto): las URLs de webhook son credenciales
+  events         String[]
+  isActive       Boolean  @default(true)
+  lastDeliveryAt DateTime?
+  lastStatus     String?
+  createdAt      DateTime @default(now())
+
+  deliveries IntegrationDelivery[]
+}
+
+model IntegrationDelivery {
+  id            String   @id @default(cuid())
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  event         String
+  ok            Boolean
+  status        Int?
+  error         String?
+  ms            Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([integrationId, createdAt])
+}
+
+// Claves para la API REST. Se guarda solo el hash; la clave se muestra una vez.
+model ApiKey {
+  id          String    @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  prefix      String    // primeros caracteres visibles para identificarla
+  keyHash     String    @unique
+  scope       String    @default("read") // read | read_write
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
 }

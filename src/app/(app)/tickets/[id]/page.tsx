@@ -13,6 +13,8 @@ import { APPROVAL_LABEL, LEVEL_LABEL, PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL, 
 import { cn, formatDateTime, ticketRef, timeAgo } from "@/lib/utils";
 import { Composer, ConfirmResolution, StaffPanel } from "./ticket-client";
 import { ItsmPanel } from "./itsm-panel";
+import { AiPanel } from "./ai-panel";
+import { aiAvailable } from "@/server/ai";
 import { knownErrorsFor } from "@/server/problems";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,9 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const org = await db.organization.findUnique({ where: { id: ctx.orgId }, select: { timezone: true } });
   const tz = org?.timezone;
 
+  const aiOn = staff ? await aiAvailable(ctx.orgId) : false;
+  let aiSummary = null;
+  try { aiSummary = t.aiSummary ? JSON.parse(t.aiSummary) : null; } catch {}
   const itsm = staff ? await Promise.all([
     db.configItem.findMany({ where: { orgId: ctx.orgId, status: { not: "RETIRED" } }, select: { id: true, name: true, type: true }, orderBy: { name: "asc" } }),
     db.problem.findMany({ where: { orgId: ctx.orgId, status: { not: "CLOSED" } }, select: { id: true, number: true, title: true }, orderBy: { number: "desc" } }),
@@ -175,7 +180,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
                 </li>
               ))}
             </ol>
-            {t.status !== "CLOSED" && (isRequester || staff) && <div className="mt-4"><Composer ticketId={t.id} staff={staff} /></div>}
+            {t.status !== "CLOSED" && (isRequester || staff) && <div className="mt-4"><Composer ticketId={t.id} staff={staff} aiOn={staff && aiOn} /></div>}
             {t.status === "CLOSED" && <p className="mt-4 rounded-lg bg-subtle px-4 py-3 text-sm text-muted">Este ticket está cerrado. {isRequester && "Si el problema volvió, puedes reabrirlo dentro de 14 días."}</p>}
           </section>
         </div>
@@ -189,6 +194,10 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
               agents={agents.map((a) => ({ id: a.id, name: a.name, teamIds: a.memberships.map((m) => m.teamId) }))} me={ctx.user.id}
             />
           ) : null}
+          {staff && (
+            <AiPanel ticketId={t.id} aiOn={aiOn} isIncident={t.type === "INCIDENT"} closed={t.status === "CLOSED"} suggestion={t.aiSuggestion as never} summary={aiSummary} summaryAt={t.aiSummaryAt ? timeAgo(t.aiSummaryAt) : null}
+              current={{ impact: t.impact, urgency: t.urgency, categoryId: t.categoryId, priority: t.priority }} />
+          )}
           {staff && itsm && (
             <ItsmPanel ticketId={t.id} closed={t.status === "CLOSED"} isIncident={t.type === "INCIDENT"} configItem={t.configItem} problem={t.problem}
               articles={t.linkedArticles} knownErrors={itsm[3]} cis={itsm[0]} problems={itsm[1]} allArticles={itsm[2]} />
@@ -248,6 +257,7 @@ function describe(a: { action: string; fromValue: string | null; toValue: string
     case "category": return `cambió la categoría a «${a.toValue}»`;
     case "csat": return `evaluó la atención con ${a.toValue}/5`;
     case "sla": return a.note ?? "alerta de SLA";
+    case "automation": return `aplicó la automatización «${a.toValue}»${a.note ? ` — ${a.note}` : ""}`;
     case "ci": return `indicó el elemento afectado «${a.toValue}»`;
     case "problem": return a.toValue ? `vinculó al problema ${a.toValue}` : "desvinculó el problema";
     case "article": return a.toValue ? `vinculó el artículo «${a.toValue}»` : (a.note ?? "desvinculó un artículo");

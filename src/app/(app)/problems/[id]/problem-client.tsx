@@ -1,7 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle2, Link2, Plus, Trash2, X } from "lucide-react";
+import { BookOpen, CheckCircle2, Link2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { aiRootCauseAction } from "@/app/actions-ai";
+import { Badge } from "@/components/ui";
 import { addTaskAction, deleteTaskAction, linkIncidentsAction, publishWorkaroundAction, resolveLinkedIncidentsAction, toggleTaskAction, unlinkIncidentAction, updateProblemAction } from "@/app/actions-itsm";
 import { Button, Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { Modal } from "@/components/modal";
@@ -32,13 +34,19 @@ export function ProblemActions({ id, status, next, hasWorkaround, hasFix, openIn
   );
 }
 
-export function RcaEditor({ id, initial, disabled }: { id: string; initial: { rcaMethod: string; rootCause: string; workaround: string; permanentFix: string }; disabled: boolean }) {
+type Rca = { hypotheses: { cause: string; evidence: string; confidence: string }[]; workaround: string; next_steps: string[] };
+
+export function RcaEditor({ id, initial, disabled, aiOn = false }: { id: string; initial: { rcaMethod: string; rootCause: string; workaround: string; permanentFix: string }; disabled: boolean; aiOn?: boolean }) {
   const [f, setF] = useState(initial);
+  const [ai, setAi] = useState<Rca | null>(null);
+  const [thinking, startAi] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
   const toast = useActionToast();
   const router = useRouter();
   const dirty = JSON.stringify(f) !== JSON.stringify(initial);
+  const askAi = () => startAi(async () => { const r = toast(await aiRootCauseAction(id)); if (r.ok && r.data) setAi(r.data as Rca); });
+  const append = (field: "rootCause" | "workaround", text: string) => setF((x) => ({ ...x, [field]: x[field] ? `${x[field]}\n\n${text}` : text }));
   const save = () => start(async () => { const r = toast(await updateProblemAction(id, f)); if (r.ok) router.refresh(); else setErrors(r.fields ?? {}); });
   const hint: Record<string, string> = {
     five_whys: "Pregunta «¿por qué?» hasta llegar al origen. Ej: 1) Outlook se cuelga → 2) el perfil supera 50 GB → 3) no hay política de archivado…",
@@ -48,8 +56,26 @@ export function RcaEditor({ id, initial, disabled }: { id: string; initial: { rc
   };
   return (
     <Card>
-      <CardHeader title="Análisis de causa raíz" description="Documenta la investigación, la solución temporal y la definitiva." action={dirty && !disabled ? <Button size="sm" loading={pending} onClick={save}>Guardar</Button> : undefined} />
+      <CardHeader title="Análisis de causa raíz" description="Documenta la investigación, la solución temporal y la definitiva."
+        action={<div className="flex gap-2">{aiOn && !disabled && <Button size="sm" variant="outline" loading={thinking} onClick={askAi}><Sparkles className="h-3.5 w-3.5 text-violet-500" />Sugerir causas con IA</Button>}{dirty && !disabled && <Button size="sm" loading={pending} onClick={save}>Guardar</Button>}</div>} />
       <div className="space-y-4 p-5">
+        {ai && (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+            <div className="flex items-center justify-between"><p className="flex items-center gap-1.5 text-sm font-medium"><Sparkles className="h-4 w-4 text-violet-500" />Hipótesis de la IA</p><button onClick={() => setAi(null)} className="text-muted hover:text-fg" aria-label="Cerrar sugerencias"><X className="h-4 w-4" /></button></div>
+            <p className="mt-0.5 text-xs text-muted">Basadas en los incidentes vinculados, los elementos de la CMDB y los cambios recientes. Verifícalas antes de documentarlas.</p>
+            <ol className="mt-3 space-y-3">
+              {ai.hypotheses.map((h, i) => (
+                <li key={i} className="rounded-lg bg-card p-3 text-sm">
+                  <div className="flex items-start justify-between gap-2"><p className="font-medium">{i + 1}. {h.cause}</p><Badge tone={h.confidence === "alta" ? "green" : h.confidence === "media" ? "amber" : "slate"}>Confianza {h.confidence}</Badge></div>
+                  <p className="mt-1 text-xs text-muted">{h.evidence}</p>
+                  <button onClick={() => append("rootCause", h.cause)} className="mt-1.5 text-xs font-medium text-primary hover:underline">Usar como causa raíz</button>
+                </li>
+              ))}
+            </ol>
+            {ai.workaround && <div className="mt-3 text-sm"><p className="font-medium">Solución temporal sugerida</p><p className="text-muted">{ai.workaround}</p><button onClick={() => append("workaround", ai.workaround)} className="mt-1 text-xs font-medium text-primary hover:underline">Usar como solución temporal</button></div>}
+            {ai.next_steps.length > 0 && <div className="mt-3 text-sm"><p className="font-medium">Para confirmar</p><ul className="list-disc pl-5 text-muted">{ai.next_steps.map((n, i) => <li key={i}>{n}</li>)}</ul></div>}
+          </div>
+        )}
         <Field label="Método" htmlFor="rca"><Select id="rca" value={f.rcaMethod} disabled={disabled} onChange={(e) => setF({ ...f, rcaMethod: e.target.value })} className="sm:w-64">{Object.entries(RCA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
         <Field label="Causa raíz" htmlFor="rc" error={errors.rootCause} hint={hint[f.rcaMethod]}><Textarea id="rc" rows={5} value={f.rootCause} disabled={disabled} onChange={(e) => setF({ ...f, rootCause: e.target.value })} /></Field>
         <Field label="Solución temporal (workaround)" htmlFor="wa" error={errors.workaround} hint="Lo que soporte puede aplicar mientras tanto. Se puede publicar en el centro de ayuda."><Textarea id="wa" rows={3} value={f.workaround} disabled={disabled} onChange={(e) => setF({ ...f, workaround: e.target.value })} /></Field>

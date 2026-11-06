@@ -12,6 +12,7 @@ import { impactAnalysis } from "./cmdb";
 import { log } from "./worklog";
 import { audit } from "./audit";
 import { can } from "@/lib/rbac";
+import { after } from "next/server";
 
 
 const optId = z.string().optional().nullable().transform((v) => v || null);
@@ -145,7 +146,8 @@ export async function submitChange(ctx: Ctx, id: string) {
     await log(tx, ctx.orgId, "change", id, ctx.user.id, "status:PENDING_APPROVAL", levels === 2 ? "Riesgo alto: requiere CAB y dirección" : c.type === "EMERGENCY" ? "Emergencia: aprobación acelerada (ECAB)" : "Enviado al CAB");
     return ids;
   });
-  await notify(ctx.orgId, approvers, { kind: c.type === "EMERGENCY" ? "danger" : "warning", title: `${c.type === "EMERGENCY" ? "Cambio de EMERGENCIA" : "Cambio"} por aprobar: CHG-${c.number}`, body: c.title, link: `/changes/${id}` }, ctx.user.id);
+  await notify(ctx.orgId, approvers, { kind: c.type === "EMERGENCY" ? "danger" : "warning", title: `${c.type === "EMERGENCY" ? "Cambio de EMERGENCIA" : "Cambio"} por aprobar: CHG-${c.number}`, body: c.title, link: `/changes/${id}`, email: true }, ctx.user.id);
+  after(async () => { const { dispatch } = await import("./integrations"); await dispatch(ctx.orgId, "change.pending_approval", { title: `CHG-${c.number} · ${c.title}`, text: `Tipo ${c.type} · riesgo ${c.risk}. Esperando aprobación del CAB.`, link: `/changes/${id}` }).catch(() => {}); });
   return { status: "PENDING_APPROVAL" as const };
 }
 
@@ -223,6 +225,7 @@ export async function transitionChange(ctx: Ctx, id: string, raw: unknown) {
   if (input.to === "REVIEW" && input.outcome && input.outcome !== "SUCCESSFUL") {
     await notify(ctx.orgId, [...(await managerIds(ctx.orgId)), c.requesterId], { kind: "danger", title: `CHG-${c.number}: resultado ${OUTCOME_LABEL[input.outcome]}`, body: input.note, link: `/changes/${id}` }, ctx.user.id);
   }
+  if (input.to === "CLOSED") after(async () => { const { dispatch } = await import("./integrations"); await dispatch(ctx.orgId, "change.closed", { title: `CHG-${c.number} · ${c.title}`, text: `Cambio cerrado. Resultado: ${c.outcome ?? "—"}.`, link: `/changes/${id}` }).catch(() => {}); });
   if (input.to === "IN_PROGRESS") await notify(ctx.orgId, await teamMemberIds(c.teamId), { kind: "info", title: `Comenzó la implementación de CHG-${c.number}`, body: c.title, link: `/changes/${id}` }, ctx.user.id);
 }
 

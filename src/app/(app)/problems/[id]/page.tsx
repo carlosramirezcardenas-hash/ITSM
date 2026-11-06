@@ -7,6 +7,7 @@ import { requireCtx } from "@/server/auth";
 import { AppError } from "@/server/errors";
 import { getProblem } from "@/server/problems";
 import { getLogs } from "@/server/worklog";
+import { aiAvailable } from "@/server/ai";
 import { Badge, Card, CardHeader, buttonClass } from "@/components/ui";
 import { PriorityBadge, StatusBadge } from "@/components/ticket-bits";
 import { WorkLog } from "@/components/worklog";
@@ -27,6 +28,7 @@ export default async function ProblemPage({ params }: { params: Promise<{ id: st
     getLogs(ctx.orgId, "problem", id),
     db.user.findMany({ where: { orgId: ctx.orgId, isActive: true, role: { in: ["AGENT", "SERVICE_MANAGER", "ORG_ADMIN"] } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+  const aiOn = await aiAvailable(ctx.orgId);
   const openIncidents = p.incidents.filter((i) => !["RESOLVED", "CLOSED"].includes(i.status)).length;
   const closed = p.status === "CLOSED";
   return (
@@ -44,7 +46,7 @@ export default async function ProblemPage({ params }: { params: Promise<{ id: st
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-6">
           {p.description && <Card className="p-5"><p className="whitespace-pre-wrap text-sm leading-relaxed">{p.description}</p></Card>}
-          <RcaEditor id={p.id} disabled={closed} initial={{ rcaMethod: p.rcaMethod ?? "five_whys", rootCause: p.rootCause ?? "", workaround: p.workaround ?? "", permanentFix: p.permanentFix ?? "" }} />
+          <RcaEditor id={p.id} disabled={closed} aiOn={aiOn} initial={{ rcaMethod: p.rcaMethod ?? "five_whys", rootCause: p.rootCause ?? "", workaround: p.workaround ?? "", permanentFix: p.permanentFix ?? "" }} />
           <Tasks problemId={p.id} disabled={closed} today={new Date().toISOString().slice(0, 10)} staff={staff} tasks={p.tasks.map((t) => ({ id: t.id, title: t.title, owner: t.owner?.name ?? null, dueDate: t.dueDate, done: !!t.doneAt }))} />
           <Card>
             <CardHeader title={`Incidentes vinculados (${p.incidents.length})`} description={openIncidents ? `${openIncidents} siguen abiertos` : "Todos resueltos"} />

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { requireCtx } from "@/server/auth";
 import { IssueForm } from "./issue-form";
+import { aiAvailable } from "@/server/ai";
 
 export const metadata: Metadata = { title: "Reportar un problema" };
 
@@ -15,5 +16,5 @@ export default async function IssuePage() {
         db.category.findMany({ where: { orgId: ctx.orgId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
       ])
     : [[], []];
-  return <IssueForm staff={staff} users={users} categories={categories} me={ctx.user.id} />;
+  return <IssueForm staff={staff} users={users} categories={categories} me={ctx.user.id} aiOn={await aiAvailable(ctx.orgId)} />;
 }

@@ -12,6 +12,26 @@ import { forbidden, invalid, notFound } from "./errors";
 import { computeSla, resumeSlaData } from "./sla";
 import { managerIds, notify, teamMemberIds } from "./notify";
 import { audit } from "./audit";
+import { after } from "next/server";
+
+/** Trabajo posterior a la respuesta: automatizaciones, IA e integraciones (no demora al usuario). */
+function afterCreate(ctx: Ctx, ticket: { id: string; type: string; number: number; title: string; priority: string }) {
+  after(async () => {
+    const { runAutomations } = await import("./automation");
+    const { dispatch } = await import("./integrations");
+    const { aiAvailable } = await import("./ai");
+    try { await runAutomations(ctx.orgId, "ticket.created", ticket.id); } catch (e) { console.error("[automation]", e); }
+    const t = await db.ticket.findUnique({ where: { id: ticket.id }, select: { priority: true, title: true, category: { select: { name: true } } } });
+    const ref = ticketRef(ticket.type, ticket.number);
+    const payload = { title: `${ref} · ${ticket.title}`, text: `Prioridad ${t?.priority ?? ticket.priority}${t?.category ? ` · ${t.category.name}` : ""}`, link: `/tickets/${ticket.id}`, fields: { Prioridad: t?.priority ?? ticket.priority, Solicitante: ctx.user.name } };
+    await dispatch(ctx.orgId, "ticket.created", payload).catch(() => {});
+    if ((t?.priority ?? ticket.priority) === "P1") await dispatch(ctx.orgId, "ticket.critical", payload).catch(() => {});
+    if (ticket.type === "INCIDENT" && (await aiAvailable(ctx.orgId))) {
+      const { triageTicket } = await import("./ai-features");
+      await triageTicket(ctx, ticket.id).catch((e) => console.error("[ai-triage]", e?.message));
+    }
+  });
+}
 
 // ------------------------------------------------------------------
 // Validación
@@ -25,7 +45,7 @@ export const incidentInput = z.object({
   urgency: level.default("MEDIUM"),
   categoryId: z.string().optional().nullable(),
   requesterId: z.string().optional().nullable(), // agente registra en nombre de alguien
-  channel: z.enum(["portal", "phone", "email", "chat", "walk-in"]).default("portal"),
+  channel: z.enum(["portal", "phone", "email", "chat", "walk-in", "api"]).default("portal"),
 });
 
 export type FormField = {
@@ -236,6 +256,7 @@ export async function createIncident(ctx: Ctx, raw: unknown) {
   if (requesterId !== ctx.user.id) {
     await notify(ctx.orgId, [requesterId], { title: `Registramos tu problema ${ref}`, body: ticket.title, link: `/tickets/${ticket.id}` });
   }
+  afterCreate(ctx, ticket);
   return ticket;
 }
 
@@ -307,13 +328,14 @@ export async function createRequest(ctx: Ctx, raw: unknown) {
   const ref = ticketRef("REQUEST", ticket.number);
   if (needsApproval) {
     await notify(ctx.orgId, [approverId], {
-      kind: "warning", title: `Aprobación pendiente: ${ref}`, body: `${requester?.name} solicita «${service.name}»`, link: `/approvals`,
+      kind: "warning", title: `Aprobación pendiente: ${ref}`, body: `${requester?.name} solicita «${service.name}»`, link: `/approvals`, email: true,
     });
   } else {
     await notify(ctx.orgId, assigneeId ? [assigneeId] : await teamMemberIds(teamId), {
       title: `${assigneeId ? "Te asignaron" : "Nueva solicitud"}: ${ref}`, body: service.name, link: `/tickets/${ticket.id}`,
     }, ctx.user.id);
   }
+  afterCreate(ctx, ticket);
   return ticket;
 }
 
@@ -554,6 +576,12 @@ export async function updateTicket(ctx: Ctx, id: string, raw: unknown) {
     return u;
   });
   for (const n of notifications) await notify(ctx.orgId, n.to, { title: n.title, body: n.body, kind: n.kind, link: `/tickets/${t.id}` }, ctx.user.id);
+  if (to === "RESOLVED") {
+    after(async () => {
+      const { dispatch } = await import("./integrations");
+      await dispatch(ctx.orgId, "ticket.resolved", { title: `${ref} · ${t.title}`, text: `Resuelto por ${ctx.user.name}: ${String(data.resolution ?? "").slice(0, 300)}`, link: `/tickets/${t.id}` }).catch(() => {});
+    });
+  }
   return updated;
 }
 
@@ -646,6 +674,7 @@ export async function confirmResolution(ctx: Ctx, id: string, raw: unknown) {
       if (input.comment) await tx.ticketComment.create({ data: { ticketId: id, authorId: ctx.user.id, body: input.comment } });
     });
     await notify(ctx.orgId, t.assigneeId ? [t.assigneeId] : await teamMemberIds(t.teamId), { kind: "warning", title: `${ref} fue reabierto`, body: input.comment || t.title, link: `/tickets/${id}` });
+    after(async () => { const { runAutomations } = await import("./automation"); await runAutomations(ctx.orgId, "ticket.reopened", id).catch(() => {}); });
   }
 }
 

@@ -45,13 +45,27 @@ conflicto de calendario; uno esperando al CAB).
 npm test               # unitarias: motor SLA (zonas horarias, feriados, pausas), matriz de prioridad, clasificación, RBAC, cifrado
 npm run test:e2e       # Fase 1 con Playwright contra el servidor en marcha (resiembra antes: npm run db:seed)
 npm run test:e2e:2     # Fase 2: problemas, cambios con CAB multinivel, CMDB, aprobación multinivel, aislamiento
+# Fase 3: IA (contra un simulador que valida cada petición), automatizaciones, predicción, webhooks y claves de API
+npm run mock:anthropic &   # simulador en :4010
+ANTHROPIC_API_KEY=sk-test ANTHROPIC_BASE_URL=http://localhost:4010 ALLOW_PRIVATE_WEBHOOKS=true npm start &
+npm run test:e2e:3
 ```
 La suite E2E cubre de punta a punta: reporte de incidente con sugerencias, solicitud con aprobación, validaciones,
 RBAC en UI y API, aprobación, tomar/escalar/resolver, transición inválida, reportes y CSV, confirmación con CSAT,
 notas internas ocultas, búsqueda global, **aislamiento entre organizaciones**, administración, superadmin,
 modo oscuro, móvil sin scroll horizontal y ausencia de errores JS.
 
-## API REST (sesión por cookie)
+## Variables de entorno (Fase 3, opcionales)
+| Variable | Para qué |
+|---|---|
+| `ANTHROPIC_API_KEY` | Activa el asistente de IA (Claude). Sin ella la app funciona con reglas e indica que la IA no está configurada. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | Correo de recuperación de contraseña y avisos de aprobación. |
+| `APP_URL` | URL pública, usada en enlaces de correos e integraciones. |
+
+## API REST (sesión por cookie o clave de API)
+Crea claves en **Administración → Integraciones e IA** y envíalas como `Authorization: Bearer itsm_…`.
+Las claves de solo lectura reciben 403 en métodos de escritura.
+
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/api/v1/tickets?view=&status=&type=&priority=&q=&page=` | Lista con visibilidad por rol |
@@ -71,8 +85,9 @@ Errores: `{ error, code, fields? }` con 401/403/404/422/429.
 ## Estructura
 ```
 prisma/            schema, migraciones, seed
-src/lib/           lógica pura y probada: sla-calc, classify, itsm (riesgo, impacto, conflictos), rbac, crypto, labels
-src/server/        dominio: auth, tickets, sla, problems, changes, cmdb, metrics, admin, notify, audit, worklog, api
+src/lib/           lógica pura y probada: sla-calc, classify, itsm (riesgo, impacto, conflictos), automation, predict, rbac, crypto, labels
+src/server/        dominio: auth, tickets, sla, problems, changes, cmdb, metrics, admin, notify, audit, worklog, api,
+                   ai, ai-features, automation, predictive, integrations, email
 src/app/(auth)/    login, recuperación de contraseña
 src/app/(app)/     portal, tickets, bandeja, aprobaciones, catálogo, ayuda, reportes, admin, plataforma,
                    problems, changes (+ calendario), cmdb

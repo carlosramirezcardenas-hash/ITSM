@@ -464,6 +464,13 @@ async function main() {
   await mkChange({ title: "Actualizar SAP S/4HANA a FPS02", description: "Actualización de feature pack con nuevas validaciones tributarias.", type: "NORMAL", status: "DRAFT", risk: "HIGH", impact: "HIGH", riskScore: 10, start: at(24, 20), end: at(25, 6), cis: [aSap.id, dbSap.id], ownerId: tomas!.id, teamId: tApps.id, riskAnswers: { production: true, downtime: true, noRollback: true } });
   await db.organization.update({ where: { id: O }, data: { changeSeq: chgSeq } });
 
+  // Automatizaciones de ejemplo (Fase 3)
+  await db.automationRule.createMany({ data: [
+    { orgId: O, name: "Avisar a gestores ante incidentes críticos", trigger: "ticket.created", position: 0, conditions: [{ field: "priority", op: "eq", value: "P1" }], actions: [{ type: "notify_managers" }] },
+    { orgId: O, name: "Derivar problemas de VPN a Infraestructura", trigger: "ticket.created", position: 1, conditions: [{ field: "type", op: "eq", value: "INCIDENT" }, { field: "text", op: "contains", value: "vpn" }], actions: [{ type: "assign_team", value: tInfra.id }] },
+    { orgId: O, name: "Escalar P2 con SLA vencido", trigger: "sla.breached", position: 2, conditions: [{ field: "priority", op: "eq", value: "P2" }], actions: [{ type: "escalate" }, { type: "add_note", value: "Escalado automáticamente: SLA de resolución vencido." }] },
+  ] });
+
   // ------------------------------------------------------------ Segunda organización (demuestra aislamiento multi-tenant)
   const org2 = await db.organization.create({ data: { name: "Globex Retail", slug: "globex", plan: "starter" } });
   const g = await db.user.create({ data: { orgId: org2.id, email: "admin@globex.demo", name: "Hernán Ibáñez", role: "ORG_ADMIN", passwordHash: hash } });
