@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #fbfbfc;
+  --bg-subtle: #f4f4f6;
+  --card: #ffffff;
+  --border: #e6e6ea;
+  --border-strong: #d4d4da;
+  --fg: #18181b;
+  --muted: #6b6b76;
+  --primary: #5b5bd6;
+  --primary-hover: #4c4cc4;
+  --primary-fg: #ffffff;
+  --primary-soft: #eeeefc;
+  --ring: #8b8bf0;
+  --sidebar: #f6f6f8;
+}
+
+.dark {
+  --bg: #0e0e11;
+  --bg-subtle: #16161a;
+  --card: #141418;
+  --border: #26262c;
+  --border-strong: #34343c;
+  --fg: #ededf0;
+  --muted: #9a9aa6;
+  --primary: #7c7cf0;
+  --primary-hover: #8f8ff5;
+  --primary-fg: #0e0e11;
+  --primary-soft: #1f1f3a;
+  --ring: #6a6ae0;
+  --sidebar: #111114;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-subtle: var(--bg-subtle);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+* { border-color: var(--border); }
+
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+
+::selection { background: var(--primary-soft); }
+
+.scrollbar-thin { scrollbar-width: thin; }
+
+@keyframes slide-in { from { transform: translateY(8px); opacity: 0 } to { transform: none; opacity: 1 } }
+.animate-in { animation: slide-in .18s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
